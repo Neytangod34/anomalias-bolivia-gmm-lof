@@ -1,0 +1,3334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detección de Anomalías con IQR, GMM y LOF · Bolivia (25.000 Registros)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .nav-link.active {
+      background-color: #eff6ff;
+      color: #1d4ed8;
+      font-weight: 600;
+      border-right: 3px solid #2563eb;
+    }
+    .card-shadow {
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- Barra superior móvil -->
+  <header class="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">BO</div>
+      <div>
+        <h1 class="text-sm font-bold text-slate-900 leading-tight">Anomalías · GMM & LOF</h1>
+        <p id="mobileHeaderSub" class="text-[11px] text-slate-500">Producción Agrícola · Bolivia (25.000 reg.)</p>
+      </div>
+    </div>
+    <button id="mobileMenuBtn" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+      Menú
+    </button>
+  </header>
+
+  <!-- Drawer móvil -->
+  <div id="mobileDrawer" class="fixed inset-0 z-50 hidden lg:hidden">
+    <div id="mobileBackdrop" class="fixed inset-0 bg-slate-900/50"></div>
+    <aside class="relative w-72 max-w-[85vw] h-full bg-white shadow-2xl flex flex-col justify-between overflow-y-auto">
+      <div class="p-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <span class="font-bold text-sm text-slate-900">Secciones del Estudio</span>
+          <button id="closeMobileBtn" class="text-slate-500 hover:text-slate-800 text-sm px-2 py-1">✕</button>
+        </div>
+        <nav id="mobileNavList" class="mt-3 space-y-1 text-sm"></nav>
+      </div>
+    </aside>
+  </div>
+
+  <div class="min-h-screen flex">
+    <!-- Sidebar fijo escritorio -->
+    <aside class="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200 z-30">
+      <div class="p-5 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-extrabold text-sm shadow">
+            BO
+          </div>
+          <div>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 block">Trabajo Individual</span>
+            <h1 class="text-base font-extrabold text-slate-900 leading-snug">GMM & LOF · Bolivia</h1>
+          </div>
+        </div>
+        <p id="sidebarDesc" class="mt-3 text-xs text-slate-500 leading-relaxed">
+          Aplicación comparativa de <strong>IQR (Tukey)</strong>, <strong>GMM</strong> y <strong>LOF</strong> sobre datos agrícolas de Bolivia (25.000 registros · 2015–2026).
+        </p>
+      </div>
+
+      <div class="flex-1 overflow-y-auto py-3 px-3">
+        <ul id="desktopNavList" class="space-y-1 text-xs"></ul>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50/70 text-[11px] text-slate-600 space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span>Modalidad:</span>
+          <strong class="text-slate-900">Individual</strong>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Cobertura:</span>
+          <strong class="text-slate-900">9 Dptos · 36 Zonas</strong>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Volumen activo:</span>
+          <strong id="sidebarVolBadge" class="text-blue-700 font-mono">25.000 reg.</strong>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="flex-1 lg:pl-72 w-full">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-14">
+
+        <!-- ========================================================= -->
+        <!-- 1. SECCIÓN #inicio + QR LATERAL LLAMATIVO                 -->
+        <!-- ========================================================= -->
+        <section id="inicio" class="scroll-mt-20 space-y-6">
+          <div class="grid lg:grid-cols-12 gap-6 items-stretch">
+            <div class="lg:col-span-8 rounded-2xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white p-6 sm:p-8 shadow-xl flex flex-col justify-between">
+              <div>
+                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  <span id="heroBadgeVol" class="px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                    Trabajo Individual · 25.000 Registros
+                  </span>
+                  <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                    Caso de Estudio: Bolivia
+                  </span>
+                  <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/30">
+                    IQR · GMM (EM) · LOF
+                  </span>
+                </div>
+
+                <h2 class="text-2xl sm:text-4xl font-extrabold mt-4 tracking-tight leading-tight">
+                  Detección de Anomalías en la Producción Agrícola de Bolivia
+                </h2>
+                <p class="mt-3 text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
+                  Estudio comparativo entre el enfoque univariado clásico (<strong>Criterio de Tukey / IQR</strong>) y dos algoritmos avanzados de aprendizaje no supervisado: <strong>Modelos de Mezclas Gaussianas (GMM)</strong> y <strong>Local Outlier Factor (LOF)</strong>, escalado a <strong>25.000 registros</strong> con simulación 2027, matriz de confusión y scripts reproducibles en RStudio.
+                </p>
+              </div>
+
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a href="#datos" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold transition">
+                  Explorar Dataset (25.000)
+                </a>
+                <a href="#gmm" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-semibold border border-white/15 transition">
+                  Probar GMM y LOF
+                </a>
+                <button id="downloadAmpliadoCsvBtn" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold transition">
+                  Descargar CSV (25.000)
+                </button>
+              </div>
+            </div>
+
+            <!-- Panel lateral llamativo: QR + Código de Acceso HTML/Página -->
+            <div class="lg:col-span-4 bg-white rounded-2xl p-5 sm:p-6 border border-blue-200/90 card-shadow flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold uppercase tracking-wider">
+                    Acceso Rápido · QR
+                  </span>
+                  <span class="font-mono text-[11px] font-bold text-slate-500">BO-25K-HTML</span>
+                </div>
+                <h3 class="text-base font-extrabold text-slate-900 mt-2">Escanear y Código de Página</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Escanea el QR o usa el código de acceso de la página/HTML para ubicar la presentación al instante.
+                </p>
+
+                <div class="mt-3 flex flex-col items-center justify-center bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+                  <canvas id="pageQrCanvas" width="144" height="144" class="rounded-lg bg-white p-1.5 shadow-sm"></canvas>
+                  <div class="mt-2 w-full">
+                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Código / Enlace de la Página o HTML:</label>
+                    <div class="flex gap-1.5">
+                      <input id="qrAccessInput" type="text" value="HTML://BOLIVIA-ANOMALIAS-25000#INICIO" class="flex-1 min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[10px] font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <button id="copyAccessCodeBtn" type="button" class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold shrink-0">
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                <span>Estado: <strong>Listo para exponer</strong></span>
+                <span id="qrActualUrlHint" class="font-mono truncate max-w-[140px]">Archivo HTML local</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 KPIs principales -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <span class="text-xs font-semibold text-slate-500">Registros Analizados</span>
+              <div id="kpiTotal" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 font-mono">25.000</div>
+              <p class="text-[11px] text-slate-500 mt-1">9 dptos · 36 zonas · 2015–2026</p>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <span class="text-xs font-semibold text-slate-500">Atípicos IQR (1.5×IQR)</span>
+              <div id="kpiIqr" class="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1 font-mono">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Criterio univariado de Tukey</p>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <span class="text-xs font-semibold text-slate-500">Anomalías GMM (EM)</span>
+              <div id="kpiGmm" class="text-2xl sm:text-3xl font-extrabold text-blue-600 mt-1 font-mono">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Baja densidad probabilística</p>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <span class="text-xs font-semibold text-slate-500">Anomalías LOF (Local)</span>
+              <div id="kpiLof" class="text-2xl sm:text-3xl font-extrabold text-rose-600 mt-1 font-mono">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Densidad local relativa a vecinos</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 2. SECCIÓN #marco                                         -->
+        <!-- ========================================================= -->
+        <section id="marco" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Fundamentación Técnica</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">1. Marco Teórico: Enfoque Clásico vs. GMM y LOF</h2>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-5">
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow space-y-2.5">
+              <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">Univariado · Tukey</span>
+              <h3 class="text-lg font-bold text-slate-900">Rango Intercuartílico (IQR)</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Define <code class="bg-slate-100 px-1 rounded">IQR = Q3 - Q1</code> y marca valores fuera de <code class="bg-slate-100 px-1 rounded">[Q1 - 1.5·IQR, Q3 + 1.5·IQR]</code>. Es robusto ante colas pesadas en una variable, pero no detecta combinaciones anómalas entre variables (ej. rendimiento normal y precio extremo simultáneo).
+              </p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow space-y-2.5">
+              <span class="inline-block px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">Probabilístico · EM</span>
+              <h3 class="text-lg font-bold text-slate-900">Mezclas Gaussianas (GMM)</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Modela los datos estandarizados como una combinación de <code class="bg-slate-100 px-1 rounded">G</code> distribuciones gaussianas ajustadas mediante Expectation-Maximization (análogo a <code class="bg-slate-100 px-1 rounded">mclust::Mclust</code>). Los puntos con menor densidad de mezcla caen en regiones atípicas.
+              </p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow space-y-2.5">
+              <span class="inline-block px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-xs font-bold">Densidad Local · k-NN</span>
+              <h3 class="text-lg font-bold text-slate-900">Local Outlier Factor (LOF)</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Compara la densidad local de alcance de cada punto con la de sus <code class="bg-slate-100 px-1 rounded">k</code> vecinos más cercanos (análogo a <code class="bg-slate-100 px-1 rounded">dbscan::lof</code>). Valores <code class="bg-slate-100 px-1 rounded">LOF &gt; 1.5</code> indican aislamiento local frente a su entorno.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 3. SECCIÓN #datos (25.000 REGISTROS + REAL=1 EXPLICADO)   -->
+        <!-- ========================================================= -->
+        <section id="datos" class="scroll-mt-20 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Base de Datos Agrícola</span>
+              <h2 id="datasetSectionTitle" class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">2. Dataset Agrícola de Bolivia (25.000 Registros)</h2>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="text-xs font-semibold text-slate-600">Volumen:</label>
+              <select id="datasetSizeSelect" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="480">480 registros</option>
+                <option value="5000">5.000 registros</option>
+                <option value="25000" selected>25.000 registros</option>
+                <option value="30000">30.000 registros</option>
+              </select>
+
+              <button id="downloadCsvBtn" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">
+                Descargar CSV (25.000)
+              </button>
+              <button id="exportJsonSummaryBtn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition">
+                Exportar JSON
+              </button>
+              <label class="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold cursor-pointer transition">
+                Cargar CSV
+                <input id="csvUploadInput" type="file" accept=".csv" class="hidden" />
+              </label>
+              <button id="resetDatasetBtn" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                Regenerar
+              </button>
+            </div>
+          </div>
+
+          <div id="copyFeedbackMsg" class="hidden px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold"></div>
+
+          <!-- Explicación visible de la selección activa (especialmente Real=1) -->
+          <div id="selectionExplainBox" class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-slate-700 leading-relaxed">
+            <div class="font-bold text-amber-900">¿Qué muestra cada selección en el Dataset?</div>
+            <p id="selectionExplainText" class="mt-1">
+              Al seleccionar <strong>Real=1</strong> (<em>Anomalía documentada</em>) se filtran los registros con evento real conocido (sequías, heladas, inundaciones, bloqueos o errores de digitación). Si además tienes elegido un departamento o palabra clave muy específica, se combinan ambos filtros.
+            </p>
+          </div>
+
+          <!-- Filtros rápidos y selectores -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex flex-wrap gap-1.5">
+                <button id="quickFilterAll" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold">Todos</button>
+                <button id="quickFilterGmm" class="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold">Solo GMM</button>
+                <button id="quickFilterC3" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold">Consenso 3/3</button>
+                <button id="quickFilterReal" class="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold border border-amber-300">Real=1</button>
+              </div>
+              <span id="tableCountInfo" class="text-xs font-mono text-slate-500">Mostrando 1–100 de 25.000 registros</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Departamento</label>
+                <select id="filterDepto" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Zona / Municipio</label>
+                <select id="filterZona" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Cultivo</label>
+                <select id="filterCultivo" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Estado / Detección</label>
+                <select id="filterEstado" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs bg-white">
+                  <option value="TODOS">Todos los registros</option>
+                  <option value="ANOMALO">Cualquier anomalía (≥1)</option>
+                  <option value="SOLO_GMM">Detectado por GMM</option>
+                  <option value="CONSENSUS_3">Consenso estricto (3/3)</option>
+                  <option value="CONSENSUS_2">Consenso ≥ 2 métodos</option>
+                  <option value="REAL_ANOMALO">Anomalía documentada (Real=1)</option>
+                  <option value="NORMAL">Solo normales</option>
+                </select>
+              </div>
+              <div class="col-span-2 sm:col-span-1">
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Buscar ID / Contexto</label>
+                <input id="filterSearch" type="text" placeholder="Ej. BO-00024, sequia, helada..." class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs" />
+              </div>
+            </div>
+
+            <!-- Tabla paginada -->
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="min-w-full divide-y divide-slate-200 text-xs">
+                <thead class="bg-slate-50 text-slate-700 font-bold">
+                  <tr>
+                    <th class="px-3 py-2.5 text-left">ID</th>
+                    <th class="px-3 py-2.5 text-left">Depto</th>
+                    <th class="px-3 py-2.5 text-left">Zona</th>
+                    <th class="px-3 py-2.5 text-left">Cultivo</th>
+                    <th class="px-3 py-2.5 text-center">Año</th>
+                    <th class="px-3 py-2.5 text-right">Sup. (ha)</th>
+                    <th class="px-3 py-2.5 text-right">Prod. (t)</th>
+                    <th class="px-3 py-2.5 text-right">Rend. (t/ha)</th>
+                    <th class="px-3 py-2.5 text-right">Precio</th>
+                    <th class="px-3 py-2.5 text-center">IQR</th>
+                    <th class="px-3 py-2.5 text-center">GMM</th>
+                    <th class="px-3 py-2.5 text-center">LOF</th>
+                    <th class="px-3 py-2.5 text-center">Consenso</th>
+                    <th class="px-3 py-2.5 text-left">Contexto</th>
+                  </tr>
+                </thead>
+                <tbody id="datasetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+              </table>
+            </div>
+
+            <!-- Controles de paginación -->
+            <div class="flex items-center justify-between pt-1">
+              <span id="pageIndicator" class="text-xs font-mono font-semibold text-slate-600">Página 1 / 250</span>
+              <div class="flex items-center gap-2">
+                <button id="prevPageBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 disabled:opacity-40">
+                  ← Anterior
+                </button>
+                <button id="nextPageBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 disabled:opacity-40">
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 4. SECCIÓN #clasico (IQR / BOXPLOT)                       -->
+        <!-- ========================================================= -->
+        <section id="clasico" class="scroll-mt-20 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-600">Enfoque Clásico Univariado</span>
+              <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">3. Método Clásico: Criterio de Tukey (IQR) y Boxplot</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-semibold text-slate-600">Variable:</label>
+              <select id="classicVarSelect" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">
+                <option value="rendimiento" selected>Rendimiento (t/ha)</option>
+                <option value="precio">Precio (Bs/qq)</option>
+                <option value="superficie">Superficie Cultivada (ha)</option>
+                <option value="produccion">Producción Total (t)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="bg-white rounded-xl p-4 border border-slate-200/80">
+              <span class="text-[11px] text-slate-500">Cuartil 1 (Q1)</span>
+              <div id="statQ1" class="text-lg font-bold font-mono text-slate-900 mt-0.5">-</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-200/80">
+              <span class="text-[11px] text-slate-500">Mediana (Q2)</span>
+              <div id="statMedian" class="text-lg font-bold font-mono text-blue-700 mt-0.5">-</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-200/80">
+              <span class="text-[11px] text-slate-500">Cuartil 3 (Q3)</span>
+              <div id="statQ3" class="text-lg font-bold font-mono text-slate-900 mt-0.5">-</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-200/80">
+              <span class="text-[11px] text-slate-500">Rango IQR</span>
+              <div id="statIqr" class="text-lg font-bold font-mono text-amber-700 mt-0.5">-</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-200/80">
+              <span class="text-[11px] text-slate-500">Límites (1.5×IQR)</span>
+              <div id="statBoundsMild" class="text-xs font-bold font-mono text-slate-800 mt-1.5">-</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-200/80">
+              <span class="text-[11px] text-slate-500">Extremos (3.0×IQR)</span>
+              <div id="statBoundsExtreme" class="text-xs font-bold font-mono text-rose-700 mt-1.5">-</div>
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <h3 class="font-bold text-sm text-slate-900">Boxplot con Dispersión (Jitter)</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Puntos normales en azul y atípicos por regla de Tukey en rojo.</p>
+              <div class="h-72 mt-3">
+                <canvas id="boxplotCanvas" class="w-full h-full"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <h3 class="font-bold text-sm text-slate-900">Comparación por Clase Documentada (0 vs. 1)</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Distribución de la variable seleccionada entre registros normales y anómalos.</p>
+              <div class="h-72 mt-3">
+                <canvas id="classBoxCanvas" class="w-full h-full"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-sm text-slate-900">Muestra de Valores Atípicos Detectados (IQR)</h3>
+              <span id="iqrOutCountBadge" class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold font-mono">0</span>
+            </div>
+            <pre id="iqrOutliersList" class="p-3 rounded-xl bg-slate-900 text-slate-100 text-xs overflow-x-auto"></pre>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 5. SECCIÓN #gmm                                           -->
+        <!-- ========================================================= -->
+        <section id="gmm" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Modelo Probabilístico Multivariante</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">4. Modelos de Mezclas Gaussianas (GMM · Algoritmo EM)</h2>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-5">
+            <div class="grid sm:grid-cols-3 gap-4">
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span>Componentes Gaussianas (G)</span>
+                  <span id="gmmGLabel" class="font-mono text-blue-700">G = 3</span>
+                </div>
+                <input id="gmmGSlider" type="range" min="2" max="6" step="1" value="3" class="w-full accent-blue-600" />
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span>Percentil de Corte (Baja Densidad)</span>
+                  <span id="gmmQuantileLabel" class="font-mono text-blue-700">5% (0.05)</span>
+                </div>
+                <input id="gmmQuantileSlider" type="range" min="1" max="15" step="1" value="5" class="w-full accent-blue-600" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Plano de Visualización 2D</label>
+                <select id="gmmAxisSelect" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold bg-white">
+                  <option value="rend_prec" selected>Rendimiento (t/ha) vs. Precio (Bs/qq)</option>
+                  <option value="sup_prod">Superficie (ha) vs. Producción (t)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="gmmLiveSummary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow">
+              <h3 class="font-bold text-sm text-slate-900">Serie Estandarizada y Alertas GMM</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Puntos rojos indican observaciones marcadas como anómalas por GMM.</p>
+              <div class="h-72 mt-3">
+                <canvas id="gmmSeriesCanvas" class="w-full h-full"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow relative">
+              <h3 class="font-bold text-sm text-slate-900">Dispersión 2D · Anomalías GMM</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Pasa el cursor sobre un punto para ver su densidad estimada.</p>
+              <div class="h-72 mt-3 relative">
+                <canvas id="gmmScatterCanvas" class="w-full h-full"></canvas>
+                <div id="gmmTooltip" class="hidden absolute z-20 pointer-events-none bg-slate-900/95 text-white text-[11px] rounded-xl px-3 py-2 shadow-xl border border-slate-700"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 6. SECCIÓN #lof                                           -->
+        <!-- ========================================================= -->
+        <section id="lof" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-rose-600">Detección Basada en Densidad Local</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">5. Local Outlier Factor (LOF · k-Vecinos y Alcance)</h2>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-4">
+            <div class="grid sm:grid-cols-3 gap-4">
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span>Vecinos (minPts / k)</span>
+                  <span id="lofKLabel" class="font-mono text-rose-700">k = 10</span>
+                </div>
+                <input id="lofKSlider" type="range" min="5" max="25" step="1" value="10" class="w-full accent-rose-600" />
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span>Umbral de Corte LOF</span>
+                  <span id="lofThreshLabel" class="font-mono text-rose-700">LOF &gt; 1.50</span>
+                </div>
+                <input id="lofThreshSlider" type="range" min="1.20" max="2.50" step="0.05" value="1.50" class="w-full accent-rose-600" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Plano de Visualización 2D</label>
+                <select id="lofAxisSelect" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold bg-white">
+                  <option value="rend_prec" selected>Rendimiento (t/ha) vs. Precio (Bs/qq)</option>
+                  <option value="sup_prod">Superficie (ha) vs. Producción (t)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <span class="text-xs font-semibold text-slate-500">Presets:</span>
+              <button data-k="8" data-thr="1.40" class="lof-preset px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold">Sensible (k=8, &gt;1.40)</button>
+              <button data-k="10" data-thr="1.50" class="lof-preset px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold">Estándar (k=10, &gt;1.50)</button>
+              <button data-k="18" data-thr="1.80" class="lof-preset px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold">Estricto (k=18, &gt;1.80)</button>
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow relative">
+              <h3 class="font-bold text-sm text-slate-900">Dispersión 2D · Anomalías Locales (LOF)</h3>
+              <p id="lofScatterSubtitle" class="text-xs text-slate-500 mt-0.5">k = 10 vecinos · Umbral LOF &gt; 1.50</p>
+              <div class="h-80 mt-3 relative">
+                <canvas id="lofScatterCanvas" class="w-full h-full"></canvas>
+                <div id="lofTooltip" class="hidden absolute z-20 pointer-events-none bg-slate-900/95 text-white text-[11px] rounded-xl px-3 py-2 shadow-xl border border-slate-700"></div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow flex flex-col">
+              <h3 class="font-bold text-sm text-slate-900">Top 10 Registros con Mayor Puntaje LOF</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Mayor aislamiento respecto a la densidad de sus vecinos.</p>
+              <div id="lofTopRanking" class="mt-3 divide-y divide-slate-100 overflow-y-auto max-h-80"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 7. SECCIÓN #evaluacion (MATRIZ DE CONFUSIÓN)              -->
+        <!-- ========================================================= -->
+        <section id="evaluacion" class="scroll-mt-20 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Validación Cuantitativa</span>
+              <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">6. Matriz de Confusión y Métricas de Desempeño</h2>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-semibold text-slate-600">Evaluar:</label>
+              <select id="evalModelSelect" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">
+                <option value="LOF" selected>LOF (Densidad Local)</option>
+                <option value="GMM">GMM (Mezclas Gaussianas)</option>
+                <option value="IQR">IQR (Criterio Tukey)</option>
+                <option value="ENSEMBLE">Consenso (GMM ∪ LOF)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-sm text-slate-900">Matriz Real (0/1) vs. Predicho (0/1)</h3>
+                <span id="evalModelBadge" class="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold font-mono">Modelo: LOF</span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div></div>
+                <div class="py-2 font-bold text-slate-700 bg-slate-100 rounded-lg">Predicho 0 (Normal)</div>
+                <div class="py-2 font-bold text-slate-700 bg-slate-100 rounded-lg">Predicho 1 (Anomalía)</div>
+
+                <div class="py-5 font-bold text-slate-700 bg-slate-100 rounded-lg flex items-center justify-center">Real 0</div>
+                <div id="cellTN" class="py-5 rounded-xl flex flex-col items-center justify-center transition">
+                  <span id="valTN" class="text-xl font-extrabold font-mono">0</span>
+                  <span class="text-[10px] font-semibold opacity-80">TN</span>
+                </div>
+                <div id="cellFP" class="py-5 rounded-xl flex flex-col items-center justify-center transition">
+                  <span id="valFP" class="text-xl font-extrabold font-mono">0</span>
+                  <span class="text-[10px] font-semibold opacity-80">FP</span>
+                </div>
+
+                <div class="py-5 font-bold text-slate-700 bg-slate-100 rounded-lg flex items-center justify-center">Real 1</div>
+                <div id="cellFN" class="py-5 rounded-xl flex flex-col items-center justify-center transition">
+                  <span id="valFN" class="text-xl font-extrabold font-mono">0</span>
+                  <span class="text-[10px] font-semibold opacity-80">FN</span>
+                </div>
+                <div id="cellTP" class="py-5 rounded-xl flex flex-col items-center justify-center transition">
+                  <span id="valTP" class="text-xl font-extrabold font-mono">0</span>
+                  <span class="text-[10px] font-semibold opacity-80">TP</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-4 gap-2 pt-2 text-center">
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span class="text-[10px] text-slate-500 block">Exactitud</span>
+                  <strong id="metricAcc" class="text-sm font-mono text-slate-900">0%</strong>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span class="text-[10px] text-slate-500 block">Precisión</span>
+                  <strong id="metricPrec" class="text-sm font-mono text-blue-700">0%</strong>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span class="text-[10px] text-slate-500 block">Sensibilidad</span>
+                  <strong id="metricRec" class="text-sm font-mono text-emerald-700">0%</strong>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span class="text-[10px] text-slate-500 block">F1-Score</span>
+                  <strong id="metricF1" class="text-sm font-mono text-indigo-700">0%</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow flex flex-col justify-between space-y-4">
+              <div>
+                <h3 class="font-bold text-sm text-slate-900">Lectura Operativa de la Matriz</h3>
+                <ul id="confusionInterpretationList" class="mt-3 space-y-2 text-xs text-slate-600 leading-relaxed"></ul>
+              </div>
+              <div id="confusionSummaryBox" class="p-4 rounded-xl bg-blue-50/70 border border-blue-200/70 text-xs text-slate-700 space-y-1"></div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow overflow-x-auto">
+            <h3 class="font-bold text-sm text-slate-900 mb-3">Comparativa de Métodos sobre el Dataset Activo</h3>
+            <table class="min-w-full divide-y divide-slate-200 text-xs">
+              <thead class="bg-slate-50 text-slate-700 font-bold">
+                <tr>
+                  <th class="px-4 py-2.5 text-left">Método / Enfoque</th>
+                  <th class="px-4 py-2.5 text-center">Alertas (TP+FP)</th>
+                  <th class="px-4 py-2.5 text-center">TP</th>
+                  <th class="px-4 py-2.5 text-center">FP</th>
+                  <th class="px-4 py-2.5 text-center">FN</th>
+                  <th class="px-4 py-2.5 text-center">Exactitud</th>
+                  <th class="px-4 py-2.5 text-center">F1-Score</th>
+                </tr>
+              </thead>
+              <tbody id="methodsComparisonBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 8. SECCIÓN #causas-prediccion (PROYECCIÓN 2027 + SIMULADOR) -->
+        <!-- ========================================================= -->
+        <section id="causas-prediccion" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Prospectiva y Simulación</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">7. Causas Agrícolas, Proyección 2027 y Simulador de Escenarios</h2>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-900">Proyección de Rendimiento al 2027</h3>
+                  <p class="text-xs text-slate-500">Tendencia histórica (2015–2026) vs. escenario base y estrés climático.</p>
+                </div>
+                <select id="projCultivoSelect" class="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold bg-white"></select>
+              </div>
+              <div class="h-72">
+                <canvas id="projectionCanvas" class="w-full h-full"></canvas>
+              </div>
+              <div class="flex flex-wrap gap-4 text-[11px] text-slate-600">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-blue-600 inline-block"></span> Histórico</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-emerald-600 inline-block"></span> Proyección Base 2027</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-rose-600 inline-block"></span> Estrés Climático 2027</span>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-4">
+              <div>
+                <h3 class="font-bold text-sm text-slate-900">Simulador Interactivo de Campaña</h3>
+                <p class="text-xs text-slate-500">Prueba valores para ver cómo reaccionan IQR, GMM y LOF.</p>
+              </div>
+
+              <div class="flex flex-wrap gap-1.5">
+                <button id="simPresetNormal" class="px-3 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold">Campaña Normal</button>
+                <button id="simPresetSequia" class="px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold">Sequía + Alza Precio</button>
+                <button id="simPresetError" class="px-3 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold">Error de Digitación</button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block font-semibold text-slate-600 mb-1">Superficie (ha)</label>
+                  <input id="simSup" type="number" value="20000" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono" />
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-600 mb-1">Rendimiento (t/ha)</label>
+                  <input id="simRend" type="number" step="0.05" value="2.85" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono" />
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-600 mb-1">Producción (t)</label>
+                  <input id="simProd" type="number" value="57000" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono" />
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-600 mb-1">Precio (Bs/qq)</label>
+                  <input id="simPrec" type="number" step="0.5" value="165" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono" />
+                </div>
+              </div>
+
+              <div id="simResultBox" class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 9. SECCIÓN #diccionario                                   -->
+        <!-- ========================================================= -->
+        <section id="diccionario" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Estructura de Variables</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">8. Diccionario de Variables del Dataset</h2>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200/80 card-shadow overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-xs">
+              <thead class="bg-slate-50 text-slate-700 font-bold">
+                <tr>
+                  <th class="px-4 py-3 text-left">Variable</th>
+                  <th class="px-4 py-3 text-left">Tipo</th>
+                  <th class="px-4 py-3 text-left">Unidad / Dominio</th>
+                  <th class="px-4 py-3 text-left">Rol en el Análisis</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr>
+                  <td class="px-4 py-2.5 font-mono font-semibold">id</td>
+                  <td class="px-4 py-2.5">Texto</td>
+                  <td class="px-4 py-2.5">BO-00001 .. BO-25000</td>
+                  <td class="px-4 py-2.5">Identificador único de registro agrícola.</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2.5 font-mono font-semibold">departamento, zona, cultivo, anio</td>
+                  <td class="px-4 py-2.5">Categórica / Entero</td>
+                  <td class="px-4 py-2.5">9 dptos · 36 zonas · 10 cultivos · 2015–2026</td>
+                  <td class="px-4 py-2.5">Contexto territorial, productivo y temporal.</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2.5 font-mono font-semibold">superficie, produccion, rendimiento, precio</td>
+                  <td class="px-4 py-2.5">Numérica</td>
+                  <td class="px-4 py-2.5">ha · toneladas · t/ha · Bs/qq</td>
+                  <td class="px-4 py-2.5">Variables de entrada para IQR, GMM (4D) y LOF (4D).</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2.5 font-mono font-semibold">realAnomalia</td>
+                  <td class="px-4 py-2.5">Binaria (0/1)</td>
+                  <td class="px-4 py-2.5">0 = Normal, 1 = Anomalía documentada</td>
+                  <td class="px-4 py-2.5">Referencia para matriz de confusión (TP, TN, FP, FN).</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 10. SECCIÓN #resultados-integrales (CONSENSO + RANKING)   -->
+        <!-- ========================================================= -->
+        <section id="resultados-integrales" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-purple-600">Síntesis Multimetodológica</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">9. Consenso Entre Métodos y Ranking Departamental</h2>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white rounded-2xl p-5 border border-rose-200 card-shadow">
+              <span class="text-xs font-semibold text-rose-700">Consenso Estricto (3/3)</span>
+              <div id="cons3Count" class="text-2xl sm:text-3xl font-extrabold font-mono text-rose-600 mt-1">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Coinciden IQR + GMM + LOF</p>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-amber-200 card-shadow">
+              <span class="text-xs font-semibold text-amber-800">Consenso Parcial (2/3)</span>
+              <div id="cons2Count" class="text-2xl sm:text-3xl font-extrabold font-mono text-amber-600 mt-1">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Coinciden dos de los tres métodos</p>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-blue-200 card-shadow">
+              <span class="text-xs font-semibold text-blue-700">Alerta Puntual (1/3)</span>
+              <div id="cons1Count" class="text-2xl sm:text-3xl font-extrabold font-mono text-blue-600 mt-1">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Detectado por un solo criterio</p>
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow overflow-x-auto">
+              <h3 class="font-bold text-sm text-slate-900 mb-3">Ranking por Departamento</h3>
+              <table class="min-w-full divide-y divide-slate-200 text-xs">
+                <thead class="bg-slate-50 text-slate-700 font-bold">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Puesto</th>
+                    <th class="px-3 py-2 text-left">Departamento</th>
+                    <th class="px-3 py-2 text-center">Total</th>
+                    <th class="px-3 py-2 text-center">Con Alerta (≥1)</th>
+                    <th class="px-3 py-2 text-center">3/3</th>
+                    <th class="px-3 py-2 text-right">% Alerta</th>
+                  </tr>
+                </thead>
+                <tbody id="deptoRankingBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 card-shadow space-y-3">
+              <h3 class="font-bold text-sm text-slate-900">Casos Prioritarios de Consenso (3/3 y 2/3)</h3>
+              <div id="consensusTopList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 11. SECCIÓN #codigo-r                                     -->
+        <!-- ========================================================= -->
+        <section id="codigo-r" class="scroll-mt-20 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Reproducibilidad Estadística</span>
+              <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">10. Scripts Base para RStudio (ggplot2, mclust, dbscan)</h2>
+            </div>
+            <button id="copyRCodeBtn" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+              Copiar Script R
+            </button>
+          </div>
+
+          <div class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800">
+            <div class="flex flex-wrap items-center gap-1.5 px-4 py-3 bg-slate-950 border-b border-slate-800">
+              <button data-tab="r_iqr" class="r-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white">1. Tukey / Boxplot</button>
+              <button data-tab="r_gmm" class="r-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800">2. GMM (mclust)</button>
+              <button data-tab="r_lof" class="r-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800">3. LOF (dbscan)</button>
+              <button data-tab="r_eval" class="r-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800">4. Matriz de Confusión</button>
+            </div>
+            <pre id="rCodeDisplay" class="p-5 text-xs text-slate-100 overflow-x-auto leading-relaxed"></pre>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 12. SECCIÓN #bitacora (ESTILO DETALLADO Y AMPLIO)         -->
+        <!-- ========================================================= -->
+        <section id="bitacora" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Flujo de Trabajo</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">11. Bitácora Metodológica por Fases</h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">Registro detallado de decisiones técnicas, depuración numérica y evolución del análisis sobre 25.000 registros.</p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/80 card-shadow space-y-7">
+            <div class="border-l-4 border-blue-600 pl-4 sm:pl-5 space-y-1.5">
+              <div class="text-xs font-bold uppercase tracking-wide text-blue-600">Fase 1 · Fundamentos Teóricos y Diseño Metodológico</div>
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Definición de criterios univariados, probabilísticos y de densidad local</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Se estructuró el marco conceptual diferenciando anomalías globales, contextuales y colectivas, así como el contraste entre detección univariada (<strong>Criterio de Tukey / IQR</strong>, boxplot, z-score y pruebas de valores atípicos) y detección multivariada o de vecindad (<strong>Modelos de Mezclas Gaussianas / GMM</strong> mediante algoritmo EM y <strong>Local Outlier Factor / LOF</strong> con <em>k</em> vecinos). Se estableció además la regla operativa de auditar el origen de cada observación atípica antes de decidir si se corrige o depura (errores de captura o conversión de unidades) o si se conserva y analiza como señal agroclimática o de mercado (sequía, helada, inundación, granizada o bloqueo carretero).
+              </p>
+            </div>
+
+            <div class="border-l-4 border-emerald-600 pl-4 sm:pl-5 space-y-1.5">
+              <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Fase 2 · Construcción del Dataset Escalado (25.000 Registros)</div>
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Cobertura territorial, temporal, de cultivos y eventos anómalos en Bolivia</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Para superar las limitaciones de una muestra reducida y probar el comportamiento de los algoritmos a gran escala, se consolidó un dataset de <strong>25.000 registros</strong> (2015–2026) distribuido en los <strong>9 departamentos</strong> de Bolivia, <strong>36 zonas/municipios</strong> y <strong>10 cultivos</strong> (Soya, Arroz, Maíz, Papa, Quinua, Trigo, Cebada, Girasol, Habas y Yuca). Cada cultivo y departamento se modeló con rangos base diferenciados de superficie, rendimiento y precio, incorporando eventos anómalos documentados en todos los territorios —incluyendo sequías, heladas, inundaciones, bloqueos logísticos y errores de digitación— y habilitando la exportación completa a CSV y JSON, la carga de CSV externos y la búsqueda filtrada por departamento, zona, cultivo y palabra clave.
+              </p>
+            </div>
+
+            <div class="border-l-4 border-amber-500 pl-4 sm:pl-5 space-y-1.5">
+              <div class="text-xs font-bold uppercase tracking-wide text-amber-700">Fase 3 · Implementación Interactiva, Estabilidad Numérica y Scripts en R</div>
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Cálculos en tiempo real para IQR, GMM y LOF, gráficos en vivo y replicabilidad en RStudio</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Se implementaron cálculos interactivos en tiempo real para <strong>IQR</strong>, <strong>GMM (EM)</strong> y <strong>LOF</strong> sobre las cuatro variables numéricas estandarizadas (<code class="bg-slate-100 px-1 rounded">superficie</code>, <code class="bg-slate-100 px-1 rounded">produccion</code>, <code class="bg-slate-100 px-1 rounded">rendimiento</code> y <code class="bg-slate-100 px-1 rounded">precio</code>), cuidando la estabilidad numérica en volúmenes de 25.000 filas (uso de <em>log-sum-exp</em> y acotación de varianzas para evitar <code class="bg-slate-100 px-1 rounded">NaN</code> en EM, y cálculo eficiente de distancias de alcance para mantener puntajes LOF finitos y sensibles a cambios en <em>k</em> y en el umbral). En paralelo, se redibujan los gráficos en <em>canvas</em> al cambiar variables o ejes y se entregaron los cuatro scripts de RStudio (<code class="bg-slate-100 px-1 rounded">ggplot2</code>, <code class="bg-slate-100 px-1 rounded">mclust</code>, <code class="bg-slate-100 px-1 rounded">dbscan</code> y matriz de confusión) para replicar el análisis sobre el mismo CSV.
+              </p>
+            </div>
+
+            <div class="border-l-4 border-purple-600 pl-4 sm:pl-5 space-y-1.5">
+              <div class="text-xs font-bold uppercase tracking-wide text-purple-700">Fase 4 · Validación, Proyección 2027, Simulador y Consenso</div>
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Matriz de confusión, escenarios prospectivos, ranking departamental y asistente conectado</h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Se integraron la <strong>matriz de confusión</strong> (TN, FP, FN, TP) con métricas de exactitud, precisión, sensibilidad y F1-Score, la <strong>proyección de rendimiento al 2027</strong> (comparando tendencia histórica, escenario base y estrés climático), el <strong>simulador interactivo de campañas</strong> con escenarios preconfigurados, el <strong>diccionario de variables</strong>, la síntesis de <strong>consenso multimétodo</strong> (3/3, 2/3 y 1/3) con <strong>ranking por departamento</strong> y el <strong>asistente conectado</strong> a los datos activos para resolver consultas rápidas durante la exposición.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 13. SECCIÓN #objetivos                                    -->
+        <!-- ========================================================= -->
+        <section id="objetivos" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Alineación Académica</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">12. Objetivos del Trabajo Individual y Estado</h2>
+          </div>
+
+          <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow space-y-4">
+            <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-200/70">
+              <span class="text-xs font-bold uppercase text-blue-700">Objetivo General</span>
+              <p class="text-sm text-slate-800 mt-1 leading-relaxed">
+                Implementar y comparar metodologías de detección de anomalías (<strong>IQR</strong>, <strong>GMM</strong> y <strong>LOF</strong>) aplicadas a la producción agrícola de Bolivia con un volumen de <strong>25.000 registros</strong>, evaluando su precisión y utilidad para identificar eventos adversos o errores de registro.
+              </p>
+            </div>
+
+            <div class="space-y-2.5 text-xs sm:text-sm">
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                <span class="text-slate-800"><strong>OE1:</strong> Fundamentar el paso del análisis univariado (IQR) hacia modelos multivariantes y de densidad local (GMM y LOF).</span>
+                <span class="shrink-0 ml-3 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">Cumplido</span>
+              </div>
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                <span class="text-slate-800"><strong>OE2:</strong> Estructurar un dataset de Bolivia (25.000 registros, 9 dptos, 36 zonas, 10 cultivos, 2015–2026) con descarga CSV y búsqueda funcional.</span>
+                <span class="shrink-0 ml-3 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">Cumplido</span>
+              </div>
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                <span class="text-slate-800"><strong>OE3:</strong> Ejecutar interactivamente IQR, GMM y LOF en tiempo real con visualización 2D y scripts reproducibles en RStudio.</span>
+                <span class="shrink-0 ml-3 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">Cumplido</span>
+              </div>
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                <span class="text-slate-800"><strong>OE4:</strong> Evaluar con matriz de confusión (TN, FP, FN, TP), proyectar al 2027, simular escenarios y consolidar consenso y ranking departamental.</span>
+                <span class="shrink-0 ml-3 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">Cumplido</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 14. SECCIÓN #conclusiones                                 -->
+        <!-- ========================================================= -->
+        <section id="conclusiones" class="scroll-mt-20 space-y-6">
+          <div class="border-b border-slate-200 pb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Síntesis Final</span>
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">13. Conclusiones y Recomendaciones Metodológicas</h2>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-5">
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow">
+              <h3 class="font-bold text-slate-900 text-base">1. Complementariedad Técnica</h3>
+              <p class="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                El <strong>Criterio de Tukey (IQR)</strong> detecta extremos univariados claros, mientras que <strong>GMM</strong> y <strong>LOF</strong> identifican anomalías multivariantes y locales en volúmenes amplios (25.000 registros).
+              </p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow">
+              <h3 class="font-bold text-slate-900 text-base">2. Consenso y Priorización</h3>
+              <p class="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                Cruzar los resultados de los tres métodos permite priorizar casos con <strong>consenso 3/3</strong> para auditoría inmediata, sin descartar alertas puntuales vinculadas a fenómenos agroclimáticos locales.
+              </p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow">
+              <h3 class="font-bold text-slate-900 text-base">3. Decisión sobre Valores Atípicos</h3>
+              <p class="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                Los <strong>errores de registro</strong> deben corregirse o depurarse, en tanto que los <strong>eventos climáticos reales</strong> (sequías, heladas, inundaciones o bloqueos) deben conservarse como señales de alerta temprana.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- 15. NUEVO BLOQUE FINAL: #radar-ejecutivo (14. PRUEBA EJECUTIVA) -->
+        <!-- ========================================================= -->
+        <section id="radar-ejecutivo" class="scroll-mt-20 space-y-6 pb-16">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Operación, Validación y Entrega</span>
+              <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">14. Prueba Ejecutiva · Radar de Alerta Temprana y Acción</h2>
+              <p class="text-xs sm:text-sm text-slate-500 mt-1">
+                Semáforo conectado a los datos activos, generador de reporte listo para WhatsApp/correo y descarga de CSV de prueba rápida (300 registros).
+              </p>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold self-start sm:self-auto">
+              BLOQUE EJECUTIVO · EN VIVO
+            </span>
+          </div>
+
+          <!-- Semáforo operativo conectado a datos activos -->
+          <div class="grid md:grid-cols-3 gap-5">
+            <!-- Semáforo 1: Corregir dato -->
+            <div class="bg-white rounded-2xl p-6 border-2 border-amber-300/90 card-shadow flex flex-col justify-between space-y-4">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 text-[11px] font-extrabold">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    CORREGIR DATO
+                  </span>
+                  <span id="semaforoDatoCount" class="text-2xl font-extrabold font-mono text-amber-700">0</span>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">Error de carga / unidad</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Casos con falla de digitación, conversión errónea de unidades (ej. quintales vs. toneladas) o picos extremos de rendimiento/producción sin evento climático ni bloqueo.
+                </p>
+                <div id="semaforoDatoTop" class="text-[11px] font-mono text-slate-500 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/60">
+                  Calculando muestra...
+                </div>
+              </div>
+              <button id="filterSemaforoDatoBtn" type="button" class="w-full py-2 px-3 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition">
+                Ver en tabla de datos →
+              </button>
+            </div>
+
+            <!-- Semáforo 2: Actuar en campo -->
+            <div class="bg-white rounded-2xl p-6 border-2 border-rose-300/90 card-shadow flex flex-col justify-between space-y-4">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 text-rose-900 text-[11px] font-extrabold">
+                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                    ACTUAR EN CAMPO
+                  </span>
+                  <span id="semaforoCampoCount" class="text-2xl font-extrabold font-mono text-rose-700">0</span>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">Sequía / helada / inundación</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Observaciones vinculadas a sequía severa, helada tardía, inundación por desborde o granizada (y caídas críticas de rendimiento) que requieren verificación o asistencia agronómica.
+                </p>
+                <div id="semaforoCampoTop" class="text-[11px] font-mono text-slate-500 bg-rose-50/70 p-2.5 rounded-xl border border-rose-200/60">
+                  Calculando muestra...
+                </div>
+              </div>
+              <button id="filterSemaforoCampoBtn" type="button" class="w-full py-2 px-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-950 text-xs font-bold transition">
+                Ver en tabla de datos →
+              </button>
+            </div>
+
+            <!-- Semáforo 3: Revisar logística/precio -->
+            <div class="bg-white rounded-2xl p-6 border-2 border-blue-300/90 card-shadow flex flex-col justify-between space-y-4">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-900 text-[11px] font-extrabold">
+                    <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                    REVISAR LOGÍSTICA / PRECIO
+                  </span>
+                  <span id="semaforoLogisticaCount" class="text-2xl font-extrabold font-mono text-blue-700">0</span>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">Bloqueos / alza de precio</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Registros marcados por bloqueos carreteros, cuellos de botella en transporte o precios fuera de rango con impacto de abastecimiento o mercado.
+                </p>
+                <div id="semaforoLogisticaTop" class="text-[11px] font-mono text-slate-500 bg-blue-50/70 p-2.5 rounded-xl border border-blue-200/60">
+                  Calculando muestra...
+                </div>
+              </div>
+              <button id="filterSemaforoLogisticaBtn" type="button" class="w-full py-2 px-3 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-950 text-xs font-bold transition">
+                Ver en tabla de datos →
+              </button>
+            </div>
+          </div>
+
+          <!-- Generador de Reporte Ejecutivo + Descarga CSV Prueba Rápida (300 registros) -->
+          <div class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow space-y-5">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-slate-900">Generador de Reporte Ejecutivo para Prueba / Cliente</h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Redacta un resumen listo para copiar y enviar por WhatsApp o correo junto con el HTML o un CSV de prueba, y descarga un CSV rápido de 300 registros.
+                </p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="refreshExecReportBtn" type="button" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition">
+                  Actualizar Resumen
+                </button>
+                <button id="copyExecReportBtn" type="button" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition">
+                  Copiar para WhatsApp / Correo
+                </button>
+                <button id="downloadQuick300CsvBtn" type="button" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">
+                  Descargar CSV Prueba Rápida (300)
+                </button>
+              </div>
+            </div>
+
+            <div class="grid sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200/70">
+              <label class="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
+                <input id="includeHtmlRefCheck" type="checkbox" checked class="rounded accent-blue-600" />
+                <span>Incluir referencia de adjunto/código HTML y CSV de prueba en el mensaje</span>
+              </label>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Nombre / Etiqueta del destinatario o prueba (opcional):</label>
+                <input id="execTargetInput" type="text" placeholder="Ej. Revisión Técnica · Bolivia GMM/LOF" class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Vista previa del Reporte Ejecutivo (WhatsApp / Correo)
+              </label>
+              <textarea id="execReportTextarea" rows="10" class="w-full rounded-xl border border-slate-300 bg-slate-950 text-slate-100 p-4 text-xs font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+
+          <footer class="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+            <span>Trabajo Individual · Detección de Anomalías con IQR, GMM y LOF (Bolivia 2015–2026)</span>
+            <span>25.000 Registros · Simulador 2027 · Consenso · Scripts RStudio · Radar Ejecutivo</span>
+          </footer>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- CHATBOT ASISTENTE FLOTANTE CONECTADO A LOS CÁLCULOS ACTIVOS -->
+  <!-- ========================================================= -->
+  <div class="fixed bottom-5 right-5 z-50">
+    <button id="chatToggleBtn" class="flex items-center gap-2 px-4 py-3 rounded-full bg-blue-700 hover:bg-blue-600 text-white font-semibold text-xs sm:text-sm shadow-xl transition" aria-label="Abrir asistente del proyecto">
+      <span>Asistente del Proyecto</span>
+      <span class="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-mono">AI</span>
+    </button>
+
+    <div id="chatPanel" class="hidden mt-3 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[75vh]">
+      <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <h4 class="font-bold text-xs sm:text-sm">Asistente Analítico Conectado</h4>
+          <p class="text-[10px] text-slate-300">Consulta datos activos (25.000 reg.), IQR, GMM, LOF y 2027</p>
+        </div>
+        <button id="chatCloseBtn" class="text-slate-300 hover:text-white text-sm px-1.5">✕</button>
+      </div>
+
+      <div id="chatMessages" class="p-3.5 space-y-2.5 overflow-y-auto flex-1 text-xs bg-slate-50">
+        <div class="p-3 rounded-xl bg-white border border-slate-200 text-slate-700 leading-relaxed">
+          ¡Hola! Estoy conectado al dataset activo de <strong>25.000 registros</strong>. Pregúntame por el <strong>resumen de anomalías (IQR, GMM, LOF)</strong>, el <strong>ranking departamental</strong>, el <strong>consenso 3/3</strong> o la <strong>proyección 2027</strong>.
+        </div>
+      </div>
+
+      <div class="px-3 py-2 bg-white border-t border-slate-100 flex flex-wrap gap-1.5">
+        <button data-q="resumen" class="chat-quick px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-semibold">Resumen actual</button>
+        <button data-q="ranking" class="chat-quick px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold">Top departamentos</button>
+        <button data-q="consenso" class="chat-quick px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold">Consenso 3/3</button>
+        <button data-q="proyeccion" class="chat-quick px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-semibold">Proyección 2027</button>
+      </div>
+
+      <form id="chatForm" class="p-2.5 bg-white border-t border-slate-200 flex gap-2">
+        <input id="chatInput" type="text" placeholder="Escribe tu pregunta sobre los datos o modelos..." class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="submit" class="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const NAV_ITEMS = [
+      { id: 'inicio', label: 'Inicio y KPIs', icon: '01' },
+      { id: 'marco', label: 'Marco Teórico', icon: '02' },
+      { id: 'datos', label: 'Dataset Bolivia (25.000)', icon: '03' },
+      { id: 'clasico', label: 'Método Clásico (IQR)', icon: '04' },
+      { id: 'gmm', label: 'GMM (mclust / EM)', icon: '05' },
+      { id: 'lof', label: 'LOF (Densidad Local)', icon: '06' },
+      { id: 'evaluacion', label: 'Matriz de Confusión', icon: '07' },
+      { id: 'causas-prediccion', label: 'Causas y Simulador 2027', icon: '08' },
+      { id: 'diccionario', label: 'Diccionario de Datos', icon: '09' },
+      { id: 'resultados-integrales', label: 'Consenso y Ranking', icon: '10' },
+      { id: 'codigo-r', label: 'Scripts en RStudio', icon: '11' },
+      { id: 'bitacora', label: 'Bitácora por Fases', icon: '12' },
+      { id: 'objetivos', label: 'Objetivos y Cumplimiento', icon: '13' },
+      { id: 'conclusiones', label: 'Conclusiones', icon: '14' },
+      { id: 'radar-ejecutivo', label: 'Prueba Ejecutiva y Radar', icon: '15' }
+    ];
+
+    const ZONAS_POR_DEPTO = {
+      'Santa Cruz': ['Montero', 'Warnes', 'Cuatro Cañadas', 'Camiri'],
+      'La Paz': ['Achacachi', 'Batallas', 'Caranavi', 'Viacha'],
+      'Cochabamba': ['Punata', 'Tarata', 'Villa Tunari', 'Quillacollo'],
+      'Oruro': ['Challapata', 'Salinas de Garci Mendoza', 'Poopó', 'Huanuni'],
+      'Potosí': ['Uyuni', 'Colcha K', 'Villazón', 'Betanzos'],
+      'Beni': ['Trinidad', 'San Ignacio de Moxos', 'Riberalta', 'Reyes'],
+      'Tarija': ['Villamontes', 'Yacuiba', 'San Lorenzo', 'Entre Ríos'],
+      'Chuquisaca': ['Monteagudo', 'Camargo', 'Sucre', 'Muyupampa'],
+      'Pando': ['Cobija', 'Porvenir', 'Puerto Rico', 'Filadelfia']
+    };
+
+    function normalizeText(str) {
+      return String(str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function drawQRCode(canvasId, text) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const size = 21;
+      const grid = Array.from({ length: size }, () => Array(size).fill(false));
+      const reserved = Array.from({ length: size }, () => Array(size).fill(false));
+
+      const placeFinder = (r0, c0) => {
+        for (let r = -1; r <= 7; r++) {
+          for (let c = -1; c <= 7; c++) {
+            const rr = r0 + r, cc = c0 + c;
+            if (rr >= 0 && rr < size && cc >= 0 && cc < size) {
+              reserved[rr][cc] = true;
+              const inBox = r >= 0 && r <= 6 && c >= 0 && c <= 6;
+              const border = r === 0 || r === 6 || c === 0 || c === 6;
+              const center = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+              grid[rr][cc] = inBox && (border || center);
+            }
+          }
+        }
+      };
+
+      placeFinder(0, 0);
+      placeFinder(0, size - 7);
+      placeFinder(size - 7, 0);
+
+      for (let i = 8; i < size - 8; i++) {
+        reserved[6][i] = reserved[i][6] = true;
+        grid[6][i] = grid[i][6] = (i % 2 === 0);
+      }
+
+      const bits = [];
+      const str = String(text || 'BO-25000');
+      let crc = 0x1d;
+      for (let i = 0; i < str.length; i++) {
+        const b = str.charCodeAt(i) & 0xff;
+        crc = ((crc << 1) ^ b) & 0xff;
+        for (let bit = 7; bit >= 0; bit--) bits.push((b >> bit) & 1);
+      }
+      for (let bit = 7; bit >= 0; bit--) bits.push((crc >> bit) & 1);
+
+      let bIdx = 0;
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (!reserved[r][c]) {
+            const dataBit = bits.length ? bits[bIdx % bits.length] : ((r + c) % 2);
+            const maskBit = ((r + c) % 2 === 0) ? 1 : 0;
+            grid[r][c] = ((dataBit ^ maskBit) === 1);
+            bIdx++;
+          }
+        }
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const margin = 8;
+      const cell = Math.floor((canvas.width - margin * 2) / size);
+      const offset = Math.floor((canvas.width - cell * size) / 2);
+
+      ctx.fillStyle = '#0f172a';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (grid[r][c]) {
+            ctx.fillRect(offset + c * cell, offset + r * cell, cell, cell);
+          }
+        }
+      }
+    }
+
+    function buildNavigation() {
+      const desktopList = document.getElementById('desktopNavList');
+      const mobileList = document.getElementById('mobileNavList');
+      desktopList.innerHTML = '';
+      mobileList.innerHTML = '';
+
+      NAV_ITEMS.forEach(item => {
+        const liD = document.createElement('li');
+        liD.innerHTML = `<a href="#${item.id}" data-target="${item.id}" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
+          <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${item.icon}</span>
+          <span class="truncate">${item.label}</span>
+        </a>`;
+        desktopList.appendChild(liD);
+
+        const liM = document.createElement('li');
+        liM.innerHTML = `<a href="#${item.id}" data-target="${item.id}" class="mobile-nav-link flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition">
+          <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${item.icon}</span>
+          <span>${item.label}</span>
+        </a>`;
+        mobileList.appendChild(liM);
+      });
+
+      const drawer = document.getElementById('mobileDrawer');
+      document.getElementById('mobileMenuBtn').addEventListener('click', () => drawer.classList.remove('hidden'));
+      document.getElementById('closeMobileBtn').addEventListener('click', () => drawer.classList.add('hidden'));
+      document.getElementById('mobileBackdrop').addEventListener('click', () => drawer.classList.add('hidden'));
+      document.querySelectorAll('.mobile-nav-link').forEach(link => {
+        link.addEventListener('click', () => drawer.classList.add('hidden'));
+      });
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            document.querySelectorAll('.nav-link').forEach(a => {
+              a.classList.toggle('active', a.dataset.target === entry.target.id);
+            });
+          }
+        });
+      }, { rootMargin: '-20% 0px -65% 0px' });
+
+      NAV_ITEMS.forEach(item => {
+        const el = document.getElementById(item.id);
+        if (el) observer.observe(el);
+      });
+    }
+
+    function seededRandom(seed) {
+      let s = seed % 2147483647;
+      if (s <= 0) s += 2147483646;
+      return function() {
+        s = (s * 16807) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    }
+
+    function generateBoliviaDataset(targetRows = 25000) {
+      const rand = seededRandom(20261120 + targetRows);
+      const normalRand = (mean, sd) => {
+        const u1 = Math.max(1e-7, rand());
+        const u2 = rand();
+        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        return mean + z * sd;
+      };
+
+      const cultivos = ['Soya', 'Arroz', 'Maíz', 'Papa', 'Quinua', 'Trigo', 'Cebada', 'Girasol', 'Habas', 'Yuca'];
+
+      const baseCultivo = {
+        'Soya':    { sup: 36000, rend: 2.30, prec: 148 },
+        'Arroz':   { sup: 18500, rend: 3.05, prec: 188 },
+        'Maíz':    { sup: 21000, rend: 3.10, prec: 118 },
+        'Papa':    { sup: 14500, rend: 6.50, prec: 162 },
+        'Quinua':  { sup: 17500, rend: 0.64, prec: 430 },
+        'Trigo':   { sup: 12000, rend: 1.45, prec: 155 },
+        'Cebada':  { sup: 11000, rend: 1.25, prec: 130 },
+        'Girasol': { sup: 24000, rend: 1.65, prec: 142 },
+        'Habas':   { sup: 7500,  rend: 1.80, prec: 195 },
+        'Yuca':    { sup: 9500,  rend: 9.80, prec: 110 }
+      };
+
+      const multDepto = {
+        'Santa Cruz': 1.55,
+        'Beni': 1.15,
+        'Cochabamba': 1.05,
+        'Tarija': 0.95,
+        'Chuquisaca': 0.92,
+        'La Paz': 0.88,
+        'Potosí': 0.82,
+        'Oruro': 0.80,
+        'Pando': 0.65
+      };
+
+      const plantillasAnomalias = [
+        { supMult: 1.0,  rendMult: 0.30, precMult: 2.20, nota: 'Sequía severa y déficit hídrico en campaña agrícola' },
+        { supMult: 1.0,  rendMult: 4.90, precMult: 1.02, nota: 'Error de digitación: rendimiento multiplicado por falla en boleta' },
+        { supMult: 1.0,  rendMult: 0.33, precMult: 2.10, nota: 'Helada tardía afecta rendimiento y dispara precio mayorista' },
+        { supMult: 2.45, rendMult: 1.22, precMult: 0.96, nota: 'Expansión extraordinaria de superficie sembrada en campaña' },
+        { supMult: 1.0,  rendMult: 0.28, precMult: 2.00, nota: 'Inundación por desborde fluvial reduce cosecha local' },
+        { supMult: 1.0,  rendMult: 1.03, precMult: 2.38, nota: 'Bloqueo carretero y cuello de botella logístico elevan precio' },
+        { supMult: 1.0,  rendMult: 5.15, precMult: 0.99, nota: 'Error de conversión de unidad (qq registrados como toneladas)' },
+        { supMult: 1.0,  rendMult: 0.32, precMult: 2.15, nota: 'Granizada severa en etapa de floración/llenado' }
+      ];
+
+      const years = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+      const deptos = Object.keys(ZONAS_POR_DEPTO);
+      const padLen = String(targetRows).length;
+      const rows = new Array(targetRows);
+
+      for (let i = 0; i < targetRows; i++) {
+        const yIdx = i % years.length;
+        const anio = years[yIdx];
+        const depto = deptos[i % deptos.length];
+        const zonas = ZONAS_POR_DEPTO[depto];
+        const zona = zonas[Math.floor(i / deptos.length) % zonas.length];
+        const cultivo = cultivos[(i * 3 + yIdx) % cultivos.length];
+
+        const p = baseCultivo[cultivo];
+        const mD = multDepto[depto];
+        const trendFactor = 1 + (yIdx - 5) * 0.012;
+
+        let sup = Math.max(900, Math.round(normalRand(p.sup * mD * trendFactor, p.sup * 0.14)));
+        let rend = Math.max(0.22, Number(normalRand(p.rend * (0.92 + mD * 0.08), p.rend * 0.11).toFixed(2)));
+        let prec = Math.max(55, Number(normalRand(p.prec * (2.05 - mD * 0.55), p.prec * 0.09).toFixed(1)));
+        let realAnomalia = 0;
+        let nota = 'Campaña dentro de rango esperado';
+
+        if (i % 18 === 0) {
+          const ev = plantillasAnomalias[Math.floor(i / 18) % plantillasAnomalias.length];
+          sup = Math.round(sup * ev.supMult);
+          rend = Number(Math.max(0.15, rend * ev.rendMult).toFixed(2));
+          prec = Number((prec * ev.precMult).toFixed(1));
+          realAnomalia = 1;
+          nota = ev.nota;
+        }
+
+        const prod = Math.round(sup * rend);
+
+        rows[i] = {
+          id: `BO-${String(i + 1).padStart(padLen, '0')}`,
+          departamento: depto,
+          zona,
+          cultivo,
+          anio,
+          superficie: sup,
+          produccion: prod,
+          rendimiento: rend,
+          precio: prec,
+          realAnomalia,
+          nota
+        };
+      }
+
+      return rows;
+    }
+
+    let currentDatasetSize = 25000;
+    let dataset = generateBoliviaDataset(currentDatasetSize);
+    let currentIqrStats = null;
+    let currentGmmMeta = { G: 3, percentile: 5, threshold: 0, logThreshold: -5 };
+
+    let currentFilteredRows = [];
+    let currentPage = 1;
+    const PAGE_SIZE = 100;
+
+    function getQuantiles(sortedArr) {
+      const clean = sortedArr.filter(v => typeof v === 'number' && Number.isFinite(v)).sort((a, b) => a - b);
+      if (!clean.length) return { q1: 0, median: 0, q3: 0 };
+      const q = (p) => {
+        const pos = (clean.length - 1) * p;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (clean[base + 1] !== undefined) {
+          return clean[base] + rest * (clean[base + 1] - clean[base]);
+        }
+        return clean[base];
+      };
+      return { q1: q(0.25), median: q(0.5), q3: q(0.75) };
+    }
+
+    function standardizeMatrix(matrix) {
+      const n = matrix.length;
+      const d = matrix[0].length;
+      const means = new Array(d).fill(0);
+      const stds = new Array(d).fill(1);
+
+      for (let j = 0; j < d; j++) {
+        let sum = 0, cnt = 0;
+        for (let i = 0; i < n; i++) {
+          const val = Number(matrix[i][j]);
+          if (Number.isFinite(val)) { sum += val; cnt++; }
+        }
+        means[j] = cnt > 0 ? sum / cnt : 0;
+
+        let sqSum = 0;
+        for (let i = 0; i < n; i++) {
+          const val = Number.isFinite(Number(matrix[i][j])) ? Number(matrix[i][j]) : means[j];
+          sqSum += Math.pow(val - means[j], 2);
+        }
+        const sd = Math.sqrt(sqSum / Math.max(1, n - 1));
+        stds[j] = Number.isFinite(sd) && sd > 1e-6 ? sd : 1;
+      }
+
+      const scaled = matrix.map(row => row.map((val, j) => {
+        const num = Number.isFinite(Number(val)) ? Number(val) : means[j];
+        const z = (num - means[j]) / stds[j];
+        return Number.isFinite(z) ? z : 0;
+      }));
+      return { scaled, means, stds };
+    }
+
+    function computeIQR(variableKey) {
+      const values = dataset.map(r => {
+        const v = Number(r[variableKey]);
+        return Number.isFinite(v) ? v : 0;
+      });
+      const sorted = [...values].sort((a, b) => a - b);
+      const { q1, median, q3 } = getQuantiles(sorted);
+      const iqr = Math.max(0, q3 - q1);
+      const lowerMild = q1 - 1.5 * iqr;
+      const upperMild = q3 + 1.5 * iqr;
+      const lowerExt = q1 - 3.0 * iqr;
+      const upperExt = q3 + 3.0 * iqr;
+
+      const mean = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
+      let sqSum = 0;
+      for (let i = 0; i < values.length; i++) sqSum += Math.pow(values[i] - mean, 2);
+      const sd = Math.sqrt(sqSum / Math.max(1, values.length - 1)) || 1;
+
+      for (let i = 0; i < dataset.length; i++) {
+        const v = values[i];
+        dataset[i].zScore = (v - mean) / sd;
+        dataset[i].iqrOutlier = (v < lowerMild || v > upperMild) ? 1 : 0;
+        dataset[i].iqrExtreme = (v < lowerExt || v > upperExt) ? 1 : 0;
+      }
+
+      const res = { q1, median, q3, iqr, lowerMild, upperMild, lowerExt, upperExt, mean, sd };
+      currentIqrStats = res;
+      return res;
+    }
+
+    function logSumExp(arr) {
+      let maxVal = -Infinity;
+      for (let i = 0; i < arr.length; i++) if (arr[i] > maxVal) maxVal = arr[i];
+      if (!Number.isFinite(maxVal)) return -1e9;
+      let sum = 0;
+      for (let i = 0; i < arr.length; i++) {
+        sum += Math.exp(Math.max(-60, arr[i] - maxVal));
+      }
+      return maxVal + Math.log(Math.max(1e-300, sum));
+    }
+
+    function computeGMM(G = 3, percentileThreshold = 5) {
+      const rawMatrix = dataset.map(r => [r.superficie, r.produccion, r.rendimiento, r.precio]);
+      const { scaled } = standardizeMatrix(rawMatrix);
+      const n = scaled.length;
+      const d = scaled[0].length;
+      const gEff = Math.max(2, Math.min(8, G));
+
+      let weights = new Array(gEff).fill(1 / gEff);
+      let means = [];
+      let vars = [];
+      for (let g = 0; g < gEff; g++) {
+        const idx = Math.min(n - 1, Math.floor(((g + 0.5) / gEff) * n));
+        means.push(scaled[idx].map((v, j) => v + (g - (gEff - 1) / 2) * 0.15 * ((j % 2 === 0) ? 1 : -1)));
+        vars.push(new Array(d).fill(1.0));
+      }
+
+      const logGauss = (x, mu, sigma2) => {
+        let lp = 0;
+        for (let j = 0; j < d; j++) {
+          const v = Math.max(0.15, Math.min(12, sigma2[j]));
+          const diff = Math.max(-15, Math.min(15, x[j] - mu[j]));
+          lp += -0.5 * (Math.log(2 * Math.PI * v) + (diff * diff) / v);
+        }
+        return lp;
+      };
+
+      const stepFit = n > 3000 ? Math.floor(n / 2500) : 1;
+      const fitIndices = [];
+      for (let i = 0; i < n; i += stepFit) fitIndices.push(i);
+      const m = fitIndices.length;
+
+      let resp = Array.from({ length: m }, () => new Array(gEff).fill(1 / gEff));
+      const logTerms = new Array(gEff);
+
+      for (let iter = 0; iter < 18; iter++) {
+        for (let ii = 0; ii < m; ii++) {
+          const x = scaled[fitIndices[ii]];
+          for (let g = 0; g < gEff; g++) {
+            logTerms[g] = Math.log(Math.max(1e-6, weights[g])) + logGauss(x, means[g], vars[g]);
+          }
+          const lse = logSumExp(logTerms);
+          for (let g = 0; g < gEff; g++) {
+            const p = Math.exp(Math.max(-60, logTerms[g] - lse));
+            resp[ii][g] = Number.isFinite(p) ? p : (1 / gEff);
+          }
+        }
+
+        for (let g = 0; g < gEff; g++) {
+          let nk = 0;
+          for (let ii = 0; ii < m; ii++) nk += resp[ii][g];
+          const denom = nk + 0.5;
+          weights[g] = (nk + 0.25) / (m + 0.25 * gEff);
+
+          for (let j = 0; j < d; j++) {
+            let sumMu = 0;
+            for (let ii = 0; ii < m; ii++) sumMu += resp[ii][g] * scaled[fitIndices[ii]][j];
+            const muNew = sumMu / denom;
+            means[g][j] = Number.isFinite(muNew) ? muNew : 0;
+
+            let sumVar = 0.25;
+            for (let ii = 0; ii < m; ii++) {
+              const diff = scaled[fitIndices[ii]][j] - means[g][j];
+              sumVar += resp[ii][g] * diff * diff;
+            }
+            const varNew = sumVar / denom;
+            vars[g][j] = Number.isFinite(varNew) ? Math.max(0.2, Math.min(10, varNew)) : 1.0;
+          }
+        }
+      }
+
+      const logDensities = new Float64Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = scaled[i];
+        for (let g = 0; g < gEff; g++) {
+          logTerms[g] = Math.log(Math.max(1e-6, weights[g])) + logGauss(x, means[g], vars[g]);
+        }
+        logDensities[i] = logSumExp(logTerms);
+      }
+
+      const sortedLog = Array.from(logDensities).sort((a, b) => a - b);
+      const cutIdx = Math.max(0, Math.min(n - 1, Math.floor((percentileThreshold / 100) * n)));
+      const logThr = sortedLog[cutIdx];
+      const linearThr = Math.exp(Math.max(-50, logThr));
+
+      currentGmmMeta = {
+        G: gEff,
+        percentile: percentileThreshold,
+        threshold: Number.isFinite(linearThr) ? linearThr : 1e-6,
+        logThreshold: Number.isFinite(logThr) ? logThr : -6
+      };
+
+      for (let i = 0; i < n; i++) {
+        const ld = logDensities[i];
+        dataset[i].scaledVec = scaled[i];
+        dataset[i].gmmLogDensity = ld;
+        dataset[i].gmmDensity = Math.exp(Math.max(-50, ld));
+        dataset[i].gmmOutlier = ld <= logThr ? 1 : 0;
+      }
+    }
+
+    function computeLOF(k = 10, threshold = 1.5) {
+      const rawMatrix = dataset.map(r => [r.superficie, r.produccion, r.rendimiento, r.precio]);
+      const { scaled } = standardizeMatrix(rawMatrix);
+      const n = scaled.length;
+      const kEff = Math.max(3, Math.min(n - 1, k));
+
+      const refIndices = [];
+      if (n <= 1500) {
+        for (let i = 0; i < n; i++) refIndices.push(i);
+      } else {
+        const step = Math.max(1, Math.floor(n / 450));
+        for (let i = 0; i < n; i += step) refIndices.push(i);
+      }
+      const m = refIndices.length;
+      const kRef = Math.min(m - 1, kEff);
+
+      const refKDist = new Float64Array(m);
+      const refNeighbors = new Array(m);
+      const refLrd = new Float64Array(m);
+
+      for (let a = 0; a < m; a++) {
+        const idxA = refIndices[a];
+        const xa = scaled[idxA];
+        const dists = new Array(m - 1);
+        let p = 0;
+        for (let b = 0; b < m; b++) {
+          if (a === b) continue;
+          const xb = scaled[refIndices[b]];
+          const d0 = xa[0] - xb[0], d1 = xa[1] - xb[1], d2 = xa[2] - xb[2], d3 = xa[3] - xb[3];
+          dists[p++] = { refPos: b, dist: Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3) };
+        }
+        dists.sort((u, v) => u.dist - v.dist);
+        refKDist[a] = dists[kRef - 1].dist;
+        refNeighbors[a] = dists.slice(0, kRef);
+      }
+
+      for (let a = 0; a < m; a++) {
+        let sumReach = 0;
+        const nbs = refNeighbors[a];
+        for (let j = 0; j < nbs.length; j++) {
+          const b = nbs[j].refPos;
+          sumReach += Math.max(refKDist[b], nbs[j].dist);
+        }
+        refLrd[a] = nbs.length / Math.max(1e-5, sumReach);
+      }
+
+      const topK = new Array(kRef);
+      for (let i = 0; i < n; i++) {
+        const xi = scaled[i];
+        let filled = 0;
+        let maxInTop = -1;
+        let maxSlot = 0;
+
+        for (let b = 0; b < m; b++) {
+          const refIdx = refIndices[b];
+          if (refIdx === i) continue;
+          const xb = scaled[refIdx];
+          const d0 = xi[0] - xb[0], d1 = xi[1] - xb[1], d2 = xi[2] - xb[2], d3 = xi[3] - xb[3];
+          const dist = Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3);
+
+          if (filled < kRef) {
+            topK[filled] = { b, dist };
+            if (dist > maxInTop) { maxInTop = dist; maxSlot = filled; }
+            filled++;
+          } else if (dist < maxInTop) {
+            topK[maxSlot] = { b, dist };
+            maxInTop = topK[0].dist;
+            maxSlot = 0;
+            for (let s = 1; s < kRef; s++) {
+              if (topK[s].dist > maxInTop) { maxInTop = topK[s].dist; maxSlot = s; }
+            }
+          }
+        }
+
+        let sumReach = 0;
+        for (let s = 0; s < filled; s++) {
+          sumReach += Math.max(refKDist[topK[s].b], topK[s].dist);
+        }
+        const lrdI = filled / Math.max(1e-5, sumReach);
+
+        let sumRatio = 0;
+        for (let s = 0; s < filled; s++) {
+          sumRatio += refLrd[topK[s].b] / Math.max(1e-5, lrdI);
+        }
+        const score = sumRatio / Math.max(1, filled);
+        const cleanScore = Number.isFinite(score) ? Number(score.toFixed(3)) : 1.0;
+
+        dataset[i].lofScore = cleanScore;
+        dataset[i].lofOutlier = cleanScore > threshold ? 1 : 0;
+        dataset[i].consensusCount = (dataset[i].iqrOutlier ? 1 : 0) + (dataset[i].gmmOutlier ? 1 : 0) + (dataset[i].lofOutlier ? 1 : 0);
+      }
+    }
+
+    // Clasificador operativo del semáforo conectado a los datos activos
+    function getOperationalBucket(r) {
+      const anyAlert = (r.iqrOutlier === 1 || r.gmmOutlier === 1 || r.lofOutlier === 1 || r.realAnomalia === 1);
+      if (!anyAlert) return null;
+
+      const txt = normalizeText(r.nota || '');
+      if (
+        txt.includes('digitacion') ||
+        txt.includes('conversion') ||
+        txt.includes('unidad') ||
+        txt.includes('error') ||
+        (r.rendimiento > 12 && !txt.includes('sequia') && !txt.includes('helada') && !txt.includes('inundacion') && !txt.includes('bloqueo'))
+      ) {
+        return 'DATO';
+      }
+
+      if (
+        txt.includes('bloqueo') ||
+        txt.includes('logist') ||
+        txt.includes('carretero') ||
+        txt.includes('precio') ||
+        (r.precio > 340 && r.rendimiento >= 1.0)
+      ) {
+        return 'LOGISTICA';
+      }
+
+      if (
+        txt.includes('sequia') ||
+        txt.includes('helada') ||
+        txt.includes('inundacion') ||
+        txt.includes('granizada') ||
+        txt.includes('hidric') ||
+        r.rendimiento < 0.75 ||
+        r.realAnomalia === 1
+      ) {
+        return 'CAMPO';
+      }
+
+      return 'DATO';
+    }
+
+    function renderOperationalRadar() {
+      const datoRows = [];
+      const campoRows = [];
+      const logisticaRows = [];
+
+      for (let i = 0; i < dataset.length; i++) {
+        const b = getOperationalBucket(dataset[i]);
+        if (b === 'DATO') datoRows.push(dataset[i]);
+        else if (b === 'CAMPO') campoRows.push(dataset[i]);
+        else if (b === 'LOGISTICA') logisticaRows.push(dataset[i]);
+      }
+
+      document.getElementById('semaforoDatoCount').textContent = datoRows.length.toLocaleString();
+      document.getElementById('semaforoCampoCount').textContent = campoRows.length.toLocaleString();
+      document.getElementById('semaforoLogisticaCount').textContent = logisticaRows.length.toLocaleString();
+
+      const fmtSample = (arr, fallback) => arr.length
+        ? arr.slice(0, 2).map(x => `${x.id} (${x.departamento} · ${x.cultivo})`).join(' · ')
+        : fallback;
+
+      document.getElementById('semaforoDatoTop').textContent =
+        fmtSample(datoRows, 'Sin casos de error de carga en el filtro actual');
+      document.getElementById('semaforoCampoTop').textContent =
+        fmtSample(campoRows, 'Sin casos agroclimáticos en el filtro actual');
+      document.getElementById('semaforoLogisticaTop').textContent =
+        fmtSample(logisticaRows, 'Sin casos logísticos/precio en el filtro actual');
+
+      return {
+        datoCount: datoRows.length,
+        campoCount: campoRows.length,
+        logisticaCount: logisticaRows.length
+      };
+    }
+
+    function buildExecutiveReportText() {
+      const total = dataset.length;
+      const nIqr = dataset.filter(r => r.iqrOutlier === 1).length;
+      const nGmm = dataset.filter(r => r.gmmOutlier === 1).length;
+      const nLof = dataset.filter(r => r.lofOutlier === 1).length;
+      const nC3 = dataset.filter(r => r.consensusCount === 3).length;
+      const radar = renderOperationalRadar();
+      const targetLabel = (document.getElementById('execTargetInput')?.value || '').trim();
+      const includeRef = document.getElementById('includeHtmlRefCheck')?.checked !== false;
+
+      const lines = [
+        `REPORTE EJECUTIVO · DETECCIÓN DE ANOMALÍAS AGRÍCOLAS (BOLIVIA)`,
+        targetLabel ? `Referencia: ${targetLabel}` : `Alcance: Dataset activo (${total.toLocaleString()} registros · 9 Deptos)`,
+        `------------------------------------------------------------`,
+        `• IQR (Tukey): ${nIqr.toLocaleString()} atípicos univariados`,
+        `• GMM (G=${currentGmmMeta.G}, corte ${currentGmmMeta.percentile}%): ${nGmm.toLocaleString()} anomalías probabilísticas`,
+        `• LOF (densidad local): ${nLof.toLocaleString()} anomalías locales`,
+        `• Consenso estricto (3/3): ${nC3.toLocaleString()} casos prioritarios`,
+        ``,
+        `SEMÁFORO OPERATIVO DE ACCIÓN:`,
+        `🟡 Corregir dato (error carga/unidad): ${radar.datoCount.toLocaleString()} casos`,
+        `🔴 Actuar en campo (sequía/helada/inundación): ${radar.campoCount.toLocaleString()} casos`,
+        `🔵 Revisar logística/precio (bloqueos/alza): ${radar.logisticaCount.toLocaleString()} casos`
+      ];
+
+      if (includeRef) {
+        const codeVal = (document.getElementById('qrAccessInput')?.value || 'HTML://BOLIVIA-ANOMALIAS-25000#INICIO').trim();
+        lines.push(``);
+        lines.push(`Adjuntos / Prueba: Se acompaña HTML interactivo (${codeVal}) y CSV de prueba rápida (300 registros) para validación directa.`);
+      }
+
+      return lines.join('\n');
+    }
+
+    function refreshExecutiveReport() {
+      const ta = document.getElementById('execReportTextarea');
+      if (ta) ta.value = buildExecutiveReportText();
+    }
+
+    function downloadQuick300CSV() {
+      const sample300 = dataset.slice(0, Math.min(300, dataset.length));
+      const headers = ['id', 'departamento', 'zona', 'cultivo', 'anio', 'superficie', 'produccion', 'rendimiento', 'precio', 'realAnomalia', 'iqrOutlier', 'gmmOutlier', 'lofOutlier', 'lofScore', 'consensusCount', 'semaforoAccion', 'nota'];
+      const chunks = [headers.join(',') + '\n'];
+      for (let i = 0; i < sample300.length; i++) {
+        const r = sample300[i];
+        const bucket = getOperationalBucket(r) || 'NORMAL';
+        const safeNota = String(r.nota || '').replace(/"/g, '""');
+        chunks.push(`${r.id},"${r.departamento}","${r.zona}","${r.cultivo}",${r.anio},${r.superficie},${r.produccion},${r.rendimiento},${r.precio},${r.realAnomalia},${r.iqrOutlier},${r.gmmOutlier},${r.lofOutlier},${r.lofScore},${r.consensusCount},"${bucket}","${safeNota}"\n`);
+      }
+      const blob = new Blob(chunks, { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bolivia_prueba_rapida_${sample300.length}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ CSV de prueba rápida (${sample300.length} registros) descargado.`);
+    }
+
+    function setupCanvas(canvas) {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const cssW = rect.width > 40 ? rect.width : (canvas.parentElement.clientWidth || 480);
+      const cssH = rect.height > 40 ? rect.height : (canvas.parentElement.clientHeight || 290);
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w: cssW, h: cssH };
+    }
+
+    function drawBoxplotJitter(varKey, stats) {
+      const canvas = document.getElementById('boxplotCanvas');
+      if (!canvas) return;
+      const { ctx, w, h } = setupCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+
+      const pad = { top: 22, right: 28, bottom: 32, left: 64 };
+      const plotW = Math.max(80, w - pad.left - pad.right);
+      const plotH = Math.max(80, h - pad.top - pad.bottom);
+
+      let minV = Infinity, maxV = -Infinity;
+      const inliers = [];
+      for (let i = 0; i < dataset.length; i++) {
+        const v = Number(dataset[i][varKey]) || 0;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+        if (v >= stats.lowerMild && v <= stats.upperMild) inliers.push(v);
+      }
+
+      const range = (maxV - minV) || 1;
+      const yMin = minV - range * 0.08;
+      const yMax = maxV + range * 0.08;
+      const toY = (v) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(pad.left, pad.top, plotW, plotH);
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= 5; i++) {
+        const val = yMin + ((yMax - yMin) * i) / 5;
+        const y = toY(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(Math.abs(val) >= 1000 ? Math.round(val).toLocaleString() : val.toFixed(1), pad.left - 8, y);
+      }
+
+      const whiskerLow = inliers.length ? Math.min(...inliers) : minV;
+      const whiskerHigh = inliers.length ? Math.max(...inliers) : maxV;
+      const cx = pad.left + plotW * 0.5;
+      const boxW = Math.min(130, plotW * 0.36);
+
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(cx, toY(whiskerLow));
+      ctx.lineTo(cx, toY(whiskerHigh));
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx - boxW * 0.25, toY(whiskerLow));
+      ctx.lineTo(cx + boxW * 0.25, toY(whiskerLow));
+      ctx.moveTo(cx - boxW * 0.25, toY(whiskerHigh));
+      ctx.lineTo(cx + boxW * 0.25, toY(whiskerHigh));
+      ctx.stroke();
+
+      const yQ1 = toY(stats.q1);
+      const yQ3 = toY(stats.q3);
+      const topBox = Math.min(yQ1, yQ3);
+      const hBox = Math.max(4, Math.abs(yQ1 - yQ3));
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.8;
+      ctx.fillRect(cx - boxW / 2, topBox, boxW, hBox);
+      ctx.strokeRect(cx - boxW / 2, topBox, boxW, hBox);
+
+      const yMed = toY(stats.median);
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx - boxW / 2, yMed);
+      ctx.lineTo(cx + boxW / 2, yMed);
+      ctx.stroke();
+
+      const rand = seededRandom(99);
+      const stepNorm = Math.max(1, Math.floor(dataset.length / 650));
+      for (let i = 0; i < dataset.length; i += stepNorm) {
+        const r = dataset[i];
+        if (r.iqrOutlier) continue;
+        const jx = cx + (rand() - 0.5) * (boxW * 0.72);
+        const jy = toY(Number(r[varKey]) || 0);
+        ctx.beginPath();
+        ctx.arc(jx, jy, 2.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(37, 99, 235, 0.45)';
+        ctx.fill();
+      }
+
+      const outliers = dataset.filter(r => r.iqrOutlier === 1);
+      const stepOut = Math.max(1, Math.floor(outliers.length / 450));
+      for (let i = 0; i < outliers.length; i += stepOut) {
+        const r = outliers[i];
+        const jx = cx + (rand() - 0.5) * (boxW * 0.72);
+        const jy = toY(Number(r[varKey]) || 0);
+        ctx.beginPath();
+        ctx.arc(jx, jy, 3.6, 0, Math.PI * 2);
+        ctx.fillStyle = '#dc2626';
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 11px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Registros agrícolas de Bolivia (n = ' + dataset.length.toLocaleString() + ')', cx, h - 10);
+    }
+
+    function drawClassBoxplot(varKey) {
+      const canvas = document.getElementById('classBoxCanvas');
+      if (!canvas) return;
+      const { ctx, w, h } = setupCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+
+      const pad = { top: 22, right: 24, bottom: 36, left: 64 };
+      const plotW = Math.max(80, w - pad.left - pad.right);
+      const plotH = Math.max(80, h - pad.top - pad.bottom);
+
+      let minV = Infinity, maxV = -Infinity;
+      for (let i = 0; i < dataset.length; i++) {
+        const v = Number(dataset[i][varKey]) || 0;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+      const range = (maxV - minV) || 1;
+      const yMin = minV - range * 0.08;
+      const yMax = maxV + range * 0.08;
+      const toY = (v) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(pad.left, pad.top, plotW, plotH);
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= 5; i++) {
+        const val = yMin + ((yMax - yMin) * i) / 5;
+        const y = toY(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(Math.abs(val) >= 1000 ? Math.round(val).toLocaleString() : val.toFixed(1), pad.left - 8, y);
+      }
+
+      const groups = [
+        { label: 'Class 0 (Normal)', items: dataset.filter(r => r.realAnomalia === 0).map(r => Number(r[varKey]) || 0), color: '#f87171', x: pad.left + plotW * 0.3 },
+        { label: 'Class 1 (Anomalía)', items: dataset.filter(r => r.realAnomalia === 1).map(r => Number(r[varKey]) || 0), color: '#06b6d4', x: pad.left + plotW * 0.72 }
+      ];
+
+      groups.forEach(g => {
+        if (!g.items.length) return;
+        const s = [...g.items].sort((a, b) => a - b);
+        const { q1, median, q3 } = getQuantiles(s);
+        const low = s[0];
+        const high = s[s.length - 1];
+        const bw = Math.min(90, plotW * 0.24);
+
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(g.x, toY(low));
+        ctx.lineTo(g.x, toY(high));
+        ctx.stroke();
+
+        const topBox = Math.min(toY(q1), toY(q3));
+        const hBox = Math.max(4, Math.abs(toY(q1) - toY(q3)));
+        ctx.fillStyle = g.color;
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(g.x - bw / 2, topBox, bw, hBox);
+        ctx.strokeRect(g.x - bw / 2, topBox, bw, hBox);
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(g.x - bw / 2, toY(median));
+        ctx.lineTo(g.x + bw / 2, toY(median));
+        ctx.stroke();
+
+        ctx.fillStyle = '#334155';
+        ctx.font = '600 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(g.label, g.x, h - 12);
+      });
+    }
+
+    function drawGMMSeries() {
+      const canvas = document.getElementById('gmmSeriesCanvas');
+      if (!canvas) return;
+      const { ctx, w, h } = setupCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+
+      const pad = { top: 20, right: 20, bottom: 34, left: 48 };
+      const plotW = Math.max(80, w - pad.left - pad.right);
+      const plotH = Math.max(80, h - pad.top - pad.bottom);
+
+      const maxPts = 600;
+      const step = Math.max(1, Math.floor(dataset.length / maxPts));
+      const sampledIndices = [];
+      for (let i = 0; i < dataset.length; i += step) sampledIndices.push(i);
+
+      const series = sampledIndices.map(idx => {
+        const v = dataset[idx].scaledVec || [0, 0, 0, 0];
+        return (v[2] - v[3]) / 1.4;
+      });
+
+      const minV = Math.min(...series, -3);
+      const maxV = Math.max(...series, 3);
+      const toX = (i) => pad.left + (i / Math.max(1, series.length - 1)) * plotW;
+      const toY = (v) => pad.top + plotH - ((v - minV) / ((maxV - minV) || 1)) * plotH;
+
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= 4; i++) {
+        const val = minV + ((maxV - minV) * i) / 4;
+        const y = toY(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(val.toFixed(1), pad.left - 6, y);
+      }
+
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      series.forEach((val, i) => {
+        const x = toX(i);
+        const y = toY(val);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      sampledIndices.forEach((origIdx, i) => {
+        if (dataset[origIdx].gmmOutlier) {
+          ctx.beginPath();
+          ctx.arc(toX(i), toY(series[i]), 3.8, 0, Math.PI * 2);
+          ctx.fillStyle = '#dc2626';
+          ctx.fill();
+        }
+      });
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 11px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Serie estratificada (1 .. ' + dataset.length.toLocaleString() + ' registros)', pad.left + plotW / 2, h - 10);
+    }
+
+    let gmmPointsCache = [];
+    let lofPointsCache = [];
+
+    function drawScatter2D(canvasId, axisMode, outlierField, cacheTarget) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const { ctx, w, h } = setupCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+
+      const pad = { top: 20, right: 24, bottom: 40, left: 64 };
+      const plotW = Math.max(80, w - pad.left - pad.right);
+      const plotH = Math.max(80, h - pad.top - pad.bottom);
+
+      const xKey = axisMode === 'sup_prod' ? 'superficie' : 'rendimiento';
+      const yKey = axisMode === 'sup_prod' ? 'produccion' : 'precio';
+      const xLabel = axisMode === 'sup_prod' ? 'Superficie Cultivada (ha)' : 'Rendimiento (t/ha)';
+      const yLabel = axisMode === 'sup_prod' ? 'Producción (t)' : 'Precio (Bs/qq)';
+
+      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      for (let i = 0; i < dataset.length; i++) {
+        const xv = Number(dataset[i][xKey]) || 0;
+        const yv = Number(dataset[i][yKey]) || 0;
+        if (xv < xMin) xMin = xv;
+        if (xv > xMax) xMax = xv;
+        if (yv < yMin) yMin = yv;
+        if (yv > yMax) yMax = yv;
+      }
+      xMin *= 0.92; xMax *= 1.06;
+      yMin *= 0.92; yMax *= 1.06;
+
+      const toX = (v) => pad.left + ((v - xMin) / ((xMax - xMin) || 1)) * plotW;
+      const toY = (v) => pad.top + plotH - ((v - yMin) / ((yMax - yMin) || 1)) * plotH;
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px Inter, sans-serif';
+
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i <= 4; i++) {
+        const val = yMin + ((yMax - yMin) * i) / 4;
+        const y = toY(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(Math.abs(val) >= 1000 ? Math.round(val).toLocaleString() : val.toFixed(1), pad.left - 6, y);
+      }
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (let i = 0; i <= 4; i++) {
+        const val = xMin + ((xMax - xMin) * i) / 4;
+        const x = toX(val);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.stroke();
+        ctx.fillText(Math.abs(val) >= 1000 ? Math.round(val).toLocaleString() : val.toFixed(1), x, pad.top + plotH + 6);
+      }
+
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.strokeRect(pad.left, pad.top, plotW, plotH);
+
+      const cache = [];
+      const normals = [];
+      const outliers = [];
+      for (let i = 0; i < dataset.length; i++) {
+        if (dataset[i][outlierField] === 1) outliers.push(dataset[i]);
+        else normals.push(dataset[i]);
+      }
+
+      const stepN = Math.max(1, Math.floor(normals.length / 1200));
+      for (let i = 0; i < normals.length; i += stepN) {
+        const r = normals[i];
+        const px = toX(Number(r[xKey]) || 0);
+        const py = toY(Number(r[yKey]) || 0);
+        ctx.beginPath();
+        ctx.arc(px, py, 2.7, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(37, 99, 235, 0.55)';
+        ctx.fill();
+        cache.push({ x: px, y: py, row: r });
+      }
+
+      const stepO = Math.max(1, Math.floor(outliers.length / 650));
+      for (let i = 0; i < outliers.length; i += stepO) {
+        const r = outliers[i];
+        const px = toX(Number(r[xKey]) || 0);
+        const py = toY(Number(r[yKey]) || 0);
+        ctx.beginPath();
+        ctx.arc(px, py, 4.4, 0, Math.PI * 2);
+        ctx.fillStyle = '#dc2626';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+        cache.push({ x: px, y: py, row: r });
+      }
+
+      if (cacheTarget === 'gmm') gmmPointsCache = cache;
+      else lofPointsCache = cache;
+
+      ctx.fillStyle = '#334155';
+      ctx.font = '600 11px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(xLabel, pad.left + plotW / 2, h - 12);
+
+      ctx.save();
+      ctx.translate(14, pad.top + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+    }
+
+    function bindCanvasHover(canvasId, tooltipId, getCache, extraTextFn) {
+      const canvas = document.getElementById(canvasId);
+      const tooltip = document.getElementById(tooltipId);
+      if (!canvas || !tooltip) return;
+
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const pts = getCache();
+
+        let closest = null;
+        let minDist = 14;
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          const d = Math.hypot(p.x - mx, p.y - my);
+          if (d < minDist) {
+            minDist = d;
+            closest = p;
+          }
+        }
+
+        if (closest) {
+          const r = closest.row;
+          tooltip.innerHTML = `
+            <div class="font-bold text-blue-300">${r.id} · ${r.departamento} (${r.zona}, ${r.anio})</div>
+            <div>Cultivo: <strong>${r.cultivo}</strong></div>
+            <div>Rend: ${r.rendimiento} t/ha | Precio: ${r.precio} Bs/qq</div>
+            <div class="text-amber-300 mt-0.5">${extraTextFn(r)}</div>
+          `;
+          tooltip.style.left = Math.min(rect.width - 230, Math.max(8, mx + 12)) + 'px';
+          tooltip.style.top = Math.max(8, my - 66) + 'px';
+          tooltip.classList.remove('hidden');
+        } else {
+          tooltip.classList.add('hidden');
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
+    }
+
+    function populateZonasSelect(selectedDepto = 'TODOS') {
+      const zonas = selectedDepto === 'TODOS'
+        ? [...new Set(dataset.map(r => r.zona))].sort()
+        : [...new Set(dataset.filter(r => r.departamento === selectedDepto).map(r => r.zona))].sort();
+
+      const zonaEl = document.getElementById('filterZona');
+      const prevZona = zonaEl.value;
+      zonaEl.innerHTML = `<option value="TODOS">Todas (${zonas.length} zonas)</option>` +
+        zonas.map(z => `<option value="${z}">${z}</option>`).join('');
+      if (zonas.includes(prevZona)) zonaEl.value = prevZona;
+      else zonaEl.value = 'TODOS';
+    }
+
+    function populateFilters() {
+      const deptos = [...new Set(dataset.map(r => r.departamento))].sort();
+      const cultivos = [...new Set(dataset.map(r => r.cultivo))].sort();
+
+      document.getElementById('filterDepto').innerHTML = `<option value="TODOS">Todos (${deptos.length} dptos)</option>` +
+        deptos.map(d => `<option value="${d}">${d}</option>`).join('');
+
+      populateZonasSelect('TODOS');
+
+      document.getElementById('filterCultivo').innerHTML = `<option value="TODOS">Todos (${cultivos.length} cultivos)</option>` +
+        cultivos.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      document.getElementById('projCultivoSelect').innerHTML = `<option value="TODOS">Promedio General (${cultivos.length} cultivos)</option>` +
+        cultivos.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function updateSelectionExplanation(estado, matchedCount) {
+      const totalReal = dataset.filter(r => r.realAnomalia === 1).length;
+      const explainEl = document.getElementById('selectionExplainText');
+      if (estado === 'REAL_ANOMALO') {
+        explainEl.innerHTML = `Selección activa: <strong>Real=1 (Anomalía documentada)</strong>. Existen <strong>${totalReal.toLocaleString()}</strong> registros documentados con eventos adversos o errores de registro en el dataset (${matchedCount.toLocaleString()} coinciden con los demás filtros actuales). Cada fila muestra su contexto en la columna <em>Contexto</em>.`;
+      } else if (estado === 'CONSENSUS_3') {
+        explainEl.innerHTML = `Selección activa: <strong>Consenso estricto (3/3)</strong>. Muestra <strong>${matchedCount.toLocaleString()}</strong> registros donde coinciden simultáneamente <strong>IQR</strong>, <strong>GMM</strong> y <strong>LOF</strong>.`;
+      } else if (estado === 'SOLO_GMM') {
+        explainEl.innerHTML = `Selección activa: <strong>Detectado por GMM</strong>. Muestra <strong>${matchedCount.toLocaleString()}</strong> registros ubicados en zonas de baja densidad probabilística del modelo de mezclas gaussianas.`;
+      } else {
+        explainEl.innerHTML = `Selección activa: <strong>${document.getElementById('filterEstado').selectedOptions[0].text}</strong>. Hay <strong>${totalReal.toLocaleString()}</strong> registros <strong>Real=1</strong> en total; haz clic en <strong>Real=1</strong> o elige <em>Anomalía documentada (Real=1)</em> para inspeccionarlos directamente.`;
+      }
+    }
+
+    function applyTableFilters(resetPage = true) {
+      const depto = document.getElementById('filterDepto').value;
+      const zona = document.getElementById('filterZona').value;
+      const cultivo = document.getElementById('filterCultivo').value;
+      const estado = document.getElementById('filterEstado').value;
+      const searchNorm = normalizeText(document.getElementById('filterSearch').value).trim();
+
+      currentFilteredRows = dataset.filter(r => {
+        if (depto !== 'TODOS' && r.departamento !== depto) return false;
+        if (zona !== 'TODOS' && r.zona !== zona) return false;
+        if (cultivo !== 'TODOS' && r.cultivo !== cultivo) return false;
+        const anyOut = r.iqrOutlier || r.gmmOutlier || r.lofOutlier;
+        if (estado === 'ANOMALO' && !anyOut) return false;
+        if (estado === 'SOLO_GMM' && r.gmmOutlier !== 1) return false;
+        if (estado === 'CONSENSUS_3' && r.consensusCount !== 3) return false;
+        if (estado === 'CONSENSUS_2' && r.consensusCount < 2) return false;
+        if (estado === 'REAL_ANOMALO' && r.realAnomalia !== 1) return false;
+        if (estado === 'NORMAL' && anyOut) return false;
+        if (searchNorm) {
+          const hay = normalizeText(`${r.id} ${r.departamento} ${r.zona} ${r.cultivo} ${r.anio} ${r.nota}`);
+          if (!hay.includes(searchNorm)) return false;
+        }
+        return true;
+      });
+
+      updateSelectionExplanation(estado, currentFilteredRows.length);
+      if (resetPage) currentPage = 1;
+      renderDatasetPage();
+    }
+
+    function renderDatasetPage() {
+      const totalFiltered = currentFilteredRows.length;
+      const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIdx = (currentPage - 1) * PAGE_SIZE;
+      const endIdx = Math.min(totalFiltered, startIdx + PAGE_SIZE);
+      const slice = currentFilteredRows.slice(startIdx, endIdx);
+
+      const tbody = document.getElementById('datasetTableBody');
+      tbody.innerHTML = slice.map(r => {
+        const badge = (flag, label) => flag
+          ? `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">${label}</span>`
+          : `<span class="text-slate-400 text-[10px]">Normal</span>`;
+
+        const consBadge = r.consensusCount === 3
+          ? `<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold text-[10px]">3/3</span>`
+          : r.consensusCount === 2
+            ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">2/3</span>`
+            : r.consensusCount === 1
+              ? `<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">1/3</span>`
+              : `<span class="text-slate-400 text-[10px]">0/3</span>`;
+
+        return `<tr class="hover:bg-slate-50/90 ${r.consensusCount === 3 ? 'bg-rose-50/35' : r.realAnomalia ? 'bg-amber-50/45' : ''}">
+          <td class="px-3 py-2 font-mono font-semibold text-slate-700">${r.id}</td>
+          <td class="px-3 py-2 font-medium text-slate-900">${r.departamento}</td>
+          <td class="px-3 py-2 text-slate-600">${r.zona}</td>
+          <td class="px-3 py-2 text-slate-700">${r.cultivo}</td>
+          <td class="px-3 py-2 text-center text-slate-600">${r.anio}</td>
+          <td class="px-3 py-2 text-right font-mono">${r.superficie.toLocaleString()}</td>
+          <td class="px-3 py-2 text-right font-mono">${r.produccion.toLocaleString()}</td>
+          <td class="px-3 py-2 text-right font-mono font-semibold">${r.rendimiento.toFixed(2)}</td>
+          <td class="px-3 py-2 text-right font-mono">${r.precio.toFixed(1)}</td>
+          <td class="px-3 py-2 text-center">${badge(r.iqrOutlier, 'Outlier')}</td>
+          <td class="px-3 py-2 text-center">${badge(r.gmmOutlier, 'Anómalo')}</td>
+          <td class="px-3 py-2 text-center">${badge(r.lofOutlier, r.lofScore)}</td>
+          <td class="px-3 py-2 text-center">${consBadge}</td>
+          <td class="px-3 py-2 text-slate-600 max-w-xs truncate" title="${r.nota}">${r.nota}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('tableCountInfo').textContent = totalFiltered > 0
+        ? `Mostrando ${startIdx + 1}–${endIdx} de ${totalFiltered.toLocaleString()} registros filtrados (Total: ${dataset.length.toLocaleString()})`
+        : `0 registros coinciden con el filtro (Total: ${dataset.length.toLocaleString()})`;
+      document.getElementById('pageIndicator').textContent = `Página ${currentPage} / ${totalPages}`;
+      document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+      document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+    }
+
+    function renderLOFRanking() {
+      const k = parseInt(document.getElementById('lofKSlider').value, 10);
+      const thr = parseFloat(document.getElementById('lofThreshSlider').value);
+
+      const top = [];
+      for (let i = 0; i < dataset.length; i++) {
+        const r = dataset[i];
+        if (top.length < 10 || r.lofScore > top[top.length - 1].lofScore) {
+          top.push(r);
+          top.sort((a, b) => b.lofScore - a.lofScore);
+          if (top.length > 10) top.pop();
+        }
+      }
+
+      document.getElementById('lofTopRanking').innerHTML = top.map((r, i) => `
+        <div class="p-3 flex items-start justify-between gap-3 hover:bg-slate-50">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">#${i + 1}</span>
+              <span class="font-bold text-xs text-slate-900">${r.id} · ${r.departamento} (${r.zona}) · ${r.cultivo} (${r.anio})</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">${r.nota} · <span class="font-mono">k=${k}, thr=${thr.toFixed(2)}</span></p>
+          </div>
+          <span class="shrink-0 px-2.5 py-1 rounded-lg font-mono text-xs font-extrabold ${r.lofOutlier ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">
+            LOF: ${r.lofScore.toFixed(2)}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function computeConfusionFor(predFn) {
+      let tp = 0, tn = 0, fp = 0, fn = 0;
+      for (let i = 0; i < dataset.length; i++) {
+        const r = dataset[i];
+        const real = r.realAnomalia === 1 ? 1 : 0;
+        const pred = predFn(r) ? 1 : 0;
+        if (real === 1 && pred === 1) tp++;
+        else if (real === 0 && pred === 0) tn++;
+        else if (real === 0 && pred === 1) fp++;
+        else if (real === 1 && pred === 0) fn++;
+      }
+      const total = dataset.length || 1;
+      const acc = ((tp + tn) / total) * 100;
+      const prec = (tp + fp) > 0 ? (tp / (tp + fp)) * 100 : 0;
+      const rec = (tp + fn) > 0 ? (tp / (tp + fn)) * 100 : 0;
+      const f1 = (prec + rec) > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+      return { tp, tn, fp, fn, acc, prec, rec, f1 };
+    }
+
+    function renderEvaluationSection() {
+      const modelKey = document.getElementById('evalModelSelect').value;
+      const predMap = {
+        LOF: r => r.lofOutlier === 1,
+        GMM: r => r.gmmOutlier === 1,
+        IQR: r => r.iqrOutlier === 1,
+        ENSEMBLE: r => r.gmmOutlier === 1 || r.lofOutlier === 1
+      };
+
+      const m = computeConfusionFor(predMap[modelKey]);
+      document.getElementById('evalModelBadge').textContent = `Modelo: ${modelKey}`;
+      document.getElementById('valTP').textContent = m.tp.toLocaleString();
+      document.getElementById('valTN').textContent = m.tn.toLocaleString();
+      document.getElementById('valFP').textContent = m.fp.toLocaleString();
+      document.getElementById('valFN').textContent = m.fn.toLocaleString();
+
+      const maxCell = Math.max(m.tp, m.tn, m.fp, m.fn, 1);
+      const styleCell = (elId, val) => {
+        const el = document.getElementById(elId);
+        const ratio = val / maxCell;
+        if (ratio > 0.65) {
+          el.style.backgroundColor = '#2563eb';
+          el.style.color = '#ffffff';
+        } else if (ratio > 0.25) {
+          el.style.backgroundColor = '#93c5fd';
+          el.style.color = '#0f172a';
+        } else {
+          el.style.backgroundColor = '#dbeafe';
+          el.style.color = '#1e293b';
+        }
+      };
+      styleCell('cellTP', m.tp);
+      styleCell('cellTN', m.tn);
+      styleCell('cellFP', m.fp);
+      styleCell('cellFN', m.fn);
+
+      document.getElementById('metricAcc').textContent = m.acc.toFixed(1) + '%';
+      document.getElementById('metricPrec').textContent = m.prec.toFixed(1) + '%';
+      document.getElementById('metricRec').textContent = m.rec.toFixed(1) + '%';
+      document.getElementById('metricF1').textContent = m.f1.toFixed(1) + '%';
+
+      document.getElementById('confusionInterpretationList').innerHTML = `
+        <li>• <strong>Real 0, Predicho 0 (${m.tn.toLocaleString()}): Verdaderos Negativos (TN)</strong> — Casos agrícolas normales que el modelo clasificó correctamente como no anómalos.</li>
+        <li>• <strong>Real 0, Predicho 1 (${m.fp.toLocaleString()}): Falsos Positivos (FP)</strong> — Casos normales marcados como anomalía (falsas alarmas).</li>
+        <li>• <strong>Real 1, Predicho 0 (${m.fn.toLocaleString()}): Falsos Negativos (FN)</strong> — Anomalías reales no detectadas por este criterio.</li>
+        <li>• <strong>Real 1, Predicho 1 (${m.tp.toLocaleString()}): Verdaderos Positivos (TP)</strong> — Anomalías reales detectadas correctamente.</li>
+      `;
+
+      document.getElementById('confusionSummaryBox').innerHTML = `
+        <div class="font-bold text-slate-900">Resumen de desempeño (${modelKey} · n = ${dataset.length.toLocaleString()}):</div>
+        <div>• Acierto total en <strong>${m.tn.toLocaleString()}</strong> normales y <strong>${m.tp.toLocaleString()}</strong> anomalías reales (${m.acc.toFixed(1)}% de exactitud).</div>
+        <div>• <strong>${m.fp.toLocaleString()}</strong> falsos positivos y <strong>${m.fn.toLocaleString()}</strong> falsos negativos · Sensibilidad: <strong>${m.rec.toFixed(1)}%</strong> · F1: <strong>${m.f1.toFixed(1)}%</strong>.</div>
+      `;
+
+      const modelsList = [
+        { name: 'Mezclas Gaussianas (GMM)', fn: predMap.GMM },
+        { name: 'Local Outlier Factor (LOF)', fn: predMap.LOF },
+        { name: 'Criterio de Tukey (IQR)', fn: predMap.IQR },
+        { name: 'Consenso (GMM ∪ LOF)', fn: predMap.ENSEMBLE }
+      ];
+
+      document.getElementById('methodsComparisonBody').innerHTML = modelsList.map(item => {
+        const res = computeConfusionFor(item.fn);
+        return `<tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-semibold text-slate-900">${item.name}</td>
+          <td class="px-4 py-3 text-center font-mono font-bold text-rose-600">${(res.tp + res.fp).toLocaleString()}</td>
+          <td class="px-4 py-3 text-center font-mono">${res.tp.toLocaleString()}</td>
+          <td class="px-4 py-3 text-center font-mono">${res.fp.toLocaleString()}</td>
+          <td class="px-4 py-3 text-center font-mono">${res.fn.toLocaleString()}</td>
+          <td class="px-4 py-3 text-center font-mono font-semibold">${res.acc.toFixed(1)}%</td>
+          <td class="px-4 py-3 text-center font-mono font-bold text-blue-700">${res.f1.toFixed(1)}%</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function drawProjection2027() {
+      const canvas = document.getElementById('projectionCanvas');
+      if (!canvas) return;
+      const { ctx, w, h } = setupCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+
+      const cultivoSel = document.getElementById('projCultivoSelect').value;
+      const subRows = cultivoSel === 'TODOS' ? dataset : dataset.filter(r => r.cultivo === cultivoSel);
+
+      const years = [...new Set(subRows.map(r => r.anio))].sort((a, b) => a - b);
+      if (!years.length) return;
+
+      const avgByYear = years.map(y => {
+        let sum = 0, cnt = 0;
+        for (let i = 0; i < subRows.length; i++) {
+          if (subRows[i].anio === y) { sum += subRows[i].rendimiento; cnt++; }
+        }
+        return cnt ? sum / cnt : 0;
+      });
+
+      const n = avgByYear.length;
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      for (let i = 0; i < n; i++) {
+        sumX += i;
+        sumY += avgByYear[i];
+        sumXY += i * avgByYear[i];
+        sumXX += i * i;
+      }
+      const slope = (n * sumXY - sumX * sumY) / Math.max(1e-6, n * sumXX - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / n;
+
+      const lastYear = years[years.length - 1];
+      const stepsTo2027 = Math.max(1, 2027 - lastYear);
+      const projBase2027 = Math.max(0.2, intercept + slope * (n - 1 + stepsTo2027));
+      const projStress2027 = Math.max(0.15, projBase2027 * 0.72);
+
+      const allYears = [...years, 2027];
+      const allVals = [...avgByYear, projBase2027, projStress2027];
+      const minV = Math.min(...allVals) * 0.85;
+      const maxV = Math.max(...allVals) * 1.12;
+
+      const pad = { top: 20, right: 24, bottom: 34, left: 54 };
+      const plotW = Math.max(80, w - pad.left - pad.right);
+      const plotH = Math.max(80, h - pad.top - pad.bottom);
+
+      const toX = (idx) => pad.left + (idx / Math.max(1, allYears.length - 1)) * plotW;
+      const toY = (v) => pad.top + plotH - ((v - minV) / ((maxV - minV) || 1)) * plotH;
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= 4; i++) {
+        const val = minV + ((maxV - minV) * i) / 4;
+        const y = toY(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(val.toFixed(2), pad.left - 6, y);
+      }
+
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      avgByYear.forEach((v, i) => {
+        const x = toX(i);
+        const y = toY(v);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      const lastX = toX(years.length - 1);
+      const lastY = toY(avgByYear[avgByYear.length - 1]);
+      const x2027 = toX(allYears.length - 1);
+      const yBase2027 = toY(projBase2027);
+      const yStress2027 = toY(projStress2027);
+
+      ctx.strokeStyle = '#059669';
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x2027, yBase2027);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x2027, yStress2027);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#059669';
+      ctx.beginPath();
+      ctx.arc(x2027, yBase2027, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.arc(x2027, yStress2027, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      allYears.forEach((yr, i) => {
+        if (i % 2 === 0 || yr === 2027) {
+          ctx.fillText(String(yr), toX(i), h - 10);
+        }
+      });
+    }
+
+    function evaluateSimulator() {
+      const sup = Number.isFinite(parseFloat(document.getElementById('simSup').value)) ? parseFloat(document.getElementById('simSup').value) : 0;
+      const prod = Number.isFinite(parseFloat(document.getElementById('simProd').value)) ? parseFloat(document.getElementById('simProd').value) : 0;
+      const rend = Number.isFinite(parseFloat(document.getElementById('simRend').value)) ? parseFloat(document.getElementById('simRend').value) : 0;
+      const prec = Number.isFinite(parseFloat(document.getElementById('simPrec').value)) ? parseFloat(document.getElementById('simPrec').value) : 0;
+
+      const varKey = document.getElementById('classicVarSelect').value;
+      const simVal = varKey === 'superficie' ? sup : varKey === 'produccion' ? prod : varKey === 'precio' ? prec : rend;
+      const iqrFlag = currentIqrStats
+        ? (simVal < currentIqrStats.lowerMild || simVal > currentIqrStats.upperMild)
+        : false;
+
+      const cols = ['superficie', 'produccion', 'rendimiento', 'precio'];
+      const vals = [sup, prod, rend, prec];
+      let sqSum = 0;
+      for (let j = 0; j < 4; j++) {
+        let sum = 0;
+        for (let i = 0; i < dataset.length; i++) sum += dataset[i][cols[j]];
+        const mean = sum / Math.max(1, dataset.length);
+        let vSum = 0;
+        for (let i = 0; i < dataset.length; i++) {
+          const d = dataset[i][cols[j]] - mean;
+          vSum += d * d;
+        }
+        const sd = Math.sqrt(vSum / Math.max(1, dataset.length - 1)) || 1;
+        const z = (vals[j] - mean) / sd;
+        sqSum += z * z;
+      }
+      const safeDist = Number.isFinite(Math.sqrt(sqSum)) ? Math.sqrt(sqSum) : 0;
+
+      const gmmFlag = safeDist > 2.4;
+      const lofFlag = safeDist > 2.0;
+
+      const flags = [iqrFlag, gmmFlag, lofFlag].filter(Boolean).length;
+      const riesgoLabel = flags >= 2 ? 'ALTO RIESGO ANÓMALO' : flags === 1 ? 'RIESGO MODERADO' : 'COMPORTAMIENTO NORMAL';
+      const riesgoColor = flags >= 2 ? 'text-rose-700' : flags === 1 ? 'text-amber-700' : 'text-emerald-700';
+
+      document.getElementById('simResultBox').innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-900">Diagnóstico Simulado:</span>
+          <span class="font-extrabold ${riesgoColor}">${riesgoLabel} (${flags}/3)</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <div class="p-2 rounded-lg bg-white border border-slate-200 text-center">
+            <span class="block text-[10px] text-slate-500">IQR (${varKey})</span>
+            <strong class="${iqrFlag ? 'text-rose-600' : 'text-emerald-700'}">${iqrFlag ? 'Atípico' : 'Normal'}</strong>
+          </div>
+          <div class="p-2 rounded-lg bg-white border border-slate-200 text-center">
+            <span class="block text-[10px] text-slate-500">GMM (4D)</span>
+            <strong class="${gmmFlag ? 'text-rose-600' : 'text-emerald-700'}">${gmmFlag ? 'Anómalo' : 'Normal'}</strong>
+          </div>
+          <div class="p-2 rounded-lg bg-white border border-slate-200 text-center">
+            <span class="block text-[10px] text-slate-500">LOF (4D)</span>
+            <strong class="${lofFlag ? 'text-rose-600' : 'text-emerald-700'}">${lofFlag ? 'Local Out.' : 'Normal'}</strong>
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-600">
+          Distancia multivariante estandarizada: <strong>${safeDist.toFixed(2)}σ</strong> · Escenario: Sup ${sup.toLocaleString()} ha, Rend ${rend.toFixed(2)} t/ha, Prod ${prod.toLocaleString()} t, Precio ${prec.toFixed(1)} Bs/qq.
+        </p>
+      `;
+    }
+
+    function renderConsensusAndRanking() {
+      let c3Count = 0, c2Count = 0, c1Count = 0;
+      const priorityCases = [];
+      const deptoStats = {};
+
+      for (let i = 0; i < dataset.length; i++) {
+        const r = dataset[i];
+        if (!deptoStats[r.departamento]) {
+          deptoStats[r.departamento] = { depto: r.departamento, total: 0, anyOut: 0, all3: 0 };
+        }
+        deptoStats[r.departamento].total++;
+
+        if (r.consensusCount === 3) {
+          c3Count++;
+          deptoStats[r.departamento].anyOut++;
+          deptoStats[r.departamento].all3++;
+          if (priorityCases.length < 16) priorityCases.push(r);
+        } else if (r.consensusCount === 2) {
+          c2Count++;
+          deptoStats[r.departamento].anyOut++;
+          if (priorityCases.length < 16) priorityCases.push(r);
+        } else if (r.consensusCount === 1) {
+          c1Count++;
+          deptoStats[r.departamento].anyOut++;
+        }
+      }
+
+      document.getElementById('cons3Count').textContent = c3Count.toLocaleString();
+      document.getElementById('cons2Count').textContent = c2Count.toLocaleString();
+      document.getElementById('cons1Count').textContent = c1Count.toLocaleString();
+
+      const ranking = Object.values(deptoStats).map(d => ({
+        ...d,
+        pct: (d.anyOut / Math.max(1, d.total)) * 100
+      })).sort((a, b) => b.anyOut - a.anyOut || b.all3 - a.all3);
+
+      document.getElementById('deptoRankingBody').innerHTML = ranking.map((row, idx) => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-3 py-2 font-mono font-bold text-slate-600">#${idx + 1}</td>
+          <td class="px-3 py-2 font-semibold text-slate-900">${row.depto}</td>
+          <td class="px-3 py-2 text-center font-mono">${row.total.toLocaleString()}</td>
+          <td class="px-3 py-2 text-center font-mono font-bold text-rose-600">${row.anyOut.toLocaleString()}</td>
+          <td class="px-3 py-2 text-center font-mono font-bold text-purple-700">${row.all3.toLocaleString()}</td>
+          <td class="px-3 py-2 text-right font-mono">${row.pct.toFixed(1)}%</td>
+        </tr>
+      `).join('');
+
+      const listEl = document.getElementById('consensusTopList');
+      if (!priorityCases.length) {
+        listEl.innerHTML = `<div class="p-3 rounded-xl bg-slate-50 text-slate-600">Ajusta los umbrales de GMM o LOF para explorar coincidencias entre métodos.</div>`;
+      } else {
+        listEl.innerHTML = priorityCases.map(r => {
+          const methods = [
+            r.iqrOutlier ? 'IQR' : null,
+            r.gmmOutlier ? 'GMM' : null,
+            r.lofOutlier ? 'LOF' : null
+          ].filter(Boolean).join(' + ');
+          const is3 = r.consensusCount === 3;
+          return `<div class="p-3 rounded-xl ${is3 ? 'bg-rose-50/60 border border-rose-200/80' : 'bg-amber-50/50 border border-amber-200/70'} flex items-start justify-between gap-2">
+            <div>
+              <div class="font-bold text-slate-900">${r.id} · ${r.departamento} (${r.zona}) · ${r.cultivo} (${r.anio})</div>
+              <div class="text-[11px] text-slate-600 mt-0.5">${r.nota}</div>
+              <div class="text-[10px] font-mono text-slate-500 mt-1">Coinciden: <strong>${methods}</strong></div>
+            </div>
+            <span class="shrink-0 px-2 py-0.5 rounded-full ${is3 ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'} font-mono font-bold text-[10px]">${r.consensusCount}/3</span>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    const R_SCRIPTS = {
+      r_iqr: `# ==============================================================================
+# 1. DETECCIÓN UNIVARIADA DE VALORES ATÍPICOS (CRITERIO DE TUKEY / BOXPLOT)
+# Dataset: bolivia_agricola_25000.csv (25.000 registros · 2015–2026)
+# ==============================================================================
+library(ggplot2)
+
+datos <- read.csv("bolivia_agricola_25000.csv", stringsAsFactors = FALSE)
+
+boxplot(datos$rendimiento,
+        main = "Rendimiento Agrícola en Bolivia (t/ha · n = 25.000)",
+        ylab = "Rendimiento (t/ha)",
+        col = "lightgray")
+
+atipicos_rend <- boxplot.stats(datos$rendimiento)$out
+print(head(atipicos_rend, 20))
+
+ggplot(datos, aes(x = "", y = rendimiento)) +
+  geom_boxplot(outlier.shape = NA, fill = "white") +
+  geom_jitter(width = 0.2, color = "blue", alpha = 0.25) +
+  labs(title = "Distribución de Rendimiento Agrícola en Bolivia (25.000 registros)",
+       x = "", y = "Rendimiento (t/ha)") +
+  theme_minimal()`,
+
+      r_gmm: `# ==============================================================================
+# 2. MODELOS DE MEZCLAS GAUSSIANAS (GMM) CON MCLUST
+# ==============================================================================
+library(mclust)
+
+datos <- read.csv("bolivia_agricola_25000.csv", stringsAsFactors = FALSE)
+X <- scale(datos[, c("superficie", "produccion", "rendimiento", "precio")])
+
+gmm_fit <- Mclust(X, G = 3)
+summary(gmm_fit)
+
+densidades <- dens(modelName = gmm_fit$modelName,
+                   data = X,
+                   parameters = gmm_fit$parameters)
+
+thr <- quantile(densidades, 0.05)
+outliers_gmm <- which(densidades < thr)
+
+cat("Anomalías detectadas con GMM:", length(outliers_gmm), "\\n")
+print(head(datos[outliers_gmm, c("id", "departamento", "zona", "cultivo", "anio", "rendimiento", "precio")]))`,
+
+      r_lof: `# ==============================================================================
+# 3. LOCAL OUTLIER FACTOR (LOF) CON DBSCAN
+# ==============================================================================
+library(dbscan)
+
+datos <- read.csv("bolivia_agricola_25000.csv", stringsAsFactors = FALSE)
+X <- scale(datos[, c("superficie", "produccion", "rendimiento", "precio")])
+
+lof_scores <- lof(X, minPts = 10)
+anomalies_lof <- which(lof_scores > 1.5)
+
+cat("Anomalías detectadas con LOF:", length(anomalies_lof), "\\n")
+print(head(datos[anomalies_lof, c("id", "departamento", "zona", "cultivo", "anio", "rendimiento", "precio")]))`,
+
+      r_eval: `# ==============================================================================
+# 4. EVALUACIÓN CON MATRIZ DE CONFUSIÓN (REAL VS. PREDICHO)
+# ==============================================================================
+library(dbscan)
+library(ggplot2)
+
+datos <- read.csv("bolivia_agricola_25000.csv", stringsAsFactors = FALSE)
+X <- scale(datos[, c("superficie", "produccion", "rendimiento", "precio")])
+
+pred_lof <- ifelse(lof(X, minPts = 10) > 1.5, 1, 0)
+real <- datos$realAnomalia
+
+cm <- table(Real = real, Predicho = pred_lof)
+print(cm)
+
+df_cm <- as.data.frame(cm)
+ggplot(df_cm, aes(x = Predicho, y = Real, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "white", size = 7, fontface = "bold") +
+  scale_fill_gradient(low = "#93c5fd", high = "#1d4ed8") +
+  labs(title = "Matriz de Confusión - Detección de Anomalías Bolivia (25.000)") +
+  theme_minimal()`
+    };
+
+    let currentRTab = 'r_iqr';
+    function renderRScript() {
+      document.getElementById('rCodeDisplay').textContent = R_SCRIPTS[currentRTab];
+      document.querySelectorAll('.r-tab-btn').forEach(btn => {
+        const active = btn.dataset.tab === currentRTab;
+        btn.className = active
+          ? 'r-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white'
+          : 'r-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800';
+      });
+    }
+
+    function updateVolumeLabels() {
+      const nFmt = dataset.length.toLocaleString();
+      document.getElementById('mobileHeaderSub').textContent = `Producción Agrícola · Bolivia (${nFmt} reg.)`;
+      document.getElementById('sidebarDesc').innerHTML = `Aplicación comparativa de <strong>IQR (Tukey)</strong>, <strong>GMM</strong> y <strong>LOF</strong> sobre datos agrícolas de Bolivia (${nFmt} registros · 2015–2026).`;
+      document.getElementById('sidebarVolBadge').textContent = `${nFmt} reg.`;
+      document.getElementById('heroBadgeVol').textContent = `Trabajo Individual · ${nFmt} Registros`;
+      document.getElementById('datasetSectionTitle').textContent = `2. Dataset Agrícola de Bolivia (${nFmt} Registros)`;
+      document.getElementById('downloadAmpliadoCsvBtn').textContent = `Descargar CSV (${nFmt})`;
+      document.getElementById('downloadCsvBtn').textContent = `Descargar CSV (${nFmt})`;
+    }
+
+    function recalculateAll() {
+      updateVolumeLabels();
+
+      const varKey = document.getElementById('classicVarSelect').value;
+      const stats = computeIQR(varKey);
+
+      const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2);
+      document.getElementById('statQ1').textContent = fmt(stats.q1);
+      document.getElementById('statMedian').textContent = fmt(stats.median);
+      document.getElementById('statQ3').textContent = fmt(stats.q3);
+      document.getElementById('statIqr').textContent = fmt(stats.iqr);
+      document.getElementById('statBoundsMild').textContent = `[${fmt(stats.lowerMild)}, ${fmt(stats.upperMild)}]`;
+      document.getElementById('statBoundsExtreme').textContent = `[${fmt(stats.lowerExt)}, ${fmt(stats.upperExt)}]`;
+
+      const iqrOutRows = dataset.filter(r => r.iqrOutlier === 1);
+      document.getElementById('iqrOutCountBadge').textContent = `${iqrOutRows.length.toLocaleString()} valores atípicos`;
+      document.getElementById('iqrOutliersList').textContent = iqrOutRows.length
+        ? `[1] ` + iqrOutRows.slice(0, 15).map(r => `${r[varKey]} (${r.departamento}-${r.cultivo})`).join('   ') + (iqrOutRows.length > 15 ? `   ... (+${(iqrOutRows.length - 15).toLocaleString()} más)` : '')
+        : 'numeric(0)  # No se detectaron valores atípicos univariados bajo 1.5 * IQR';
+
+      drawBoxplotJitter(varKey, stats);
+      drawClassBoxplot(varKey);
+
+      const G = parseInt(document.getElementById('gmmGSlider').value, 10);
+      const qPct = parseInt(document.getElementById('gmmQuantileSlider').value, 10);
+      const gmmAxis = document.getElementById('gmmAxisSelect').value;
+      document.getElementById('gmmGLabel').textContent = `G = ${G}`;
+      document.getElementById('gmmQuantileLabel').textContent = `${qPct}% (${(qPct / 100).toFixed(2)})`;
+
+      computeGMM(G, qPct);
+      drawGMMSeries();
+      drawScatter2D('gmmScatterCanvas', gmmAxis, 'gmmOutlier', 'gmm');
+
+      let gmmOutCount = 0, gmmTruePos = 0;
+      for (let i = 0; i < dataset.length; i++) {
+        if (dataset[i].gmmOutlier === 1) {
+          gmmOutCount++;
+          if (dataset[i].realAnomalia === 1) gmmTruePos++;
+        }
+      }
+
+      document.getElementById('gmmLiveSummary').innerHTML = `
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+          <span class="text-[10px] text-slate-500 block">Componentes (G)</span>
+          <strong class="font-mono text-sm text-blue-700">${currentGmmMeta.G} gaussianas</strong>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+          <span class="text-[10px] text-slate-500 block">Umbral Log-Densidad</span>
+          <strong class="font-mono text-xs text-slate-800">${currentGmmMeta.logThreshold.toFixed(2)} (${currentGmmMeta.threshold.toExponential(1)})</strong>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+          <span class="text-[10px] text-slate-500 block">Marcados GMM</span>
+          <strong class="font-mono text-sm text-rose-600">${gmmOutCount.toLocaleString()} (${((gmmOutCount / Math.max(1, dataset.length)) * 100).toFixed(1)}%)</strong>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+          <span class="text-[10px] text-slate-500 block">Coinciden Real=1</span>
+          <strong class="font-mono text-sm text-emerald-700">${gmmTruePos.toLocaleString()} casos</strong>
+        </div>
+      `;
+
+      const k = parseInt(document.getElementById('lofKSlider').value, 10);
+      const lofThresh = parseFloat(document.getElementById('lofThreshSlider').value);
+      const lofAxis = document.getElementById('lofAxisSelect').value;
+      document.getElementById('lofKLabel').textContent = `k = ${k}`;
+      document.getElementById('lofThreshLabel').textContent = `LOF > ${lofThresh.toFixed(2)}`;
+
+      computeLOF(k, lofThresh);
+      drawScatter2D('lofScatterCanvas', lofAxis, 'lofOutlier', 'lof');
+      renderLOFRanking();
+
+      let lofOutCount = 0;
+      for (let i = 0; i < dataset.length; i++) if (dataset[i].lofOutlier === 1) lofOutCount++;
+
+      document.getElementById('lofScatterSubtitle').textContent =
+        `k = ${k} vecinos · Umbral LOF > ${lofThresh.toFixed(2)} · Detectados: ${lofOutCount.toLocaleString()} registros`;
+
+      document.getElementById('kpiTotal').textContent = dataset.length.toLocaleString();
+      document.getElementById('kpiIqr').textContent = iqrOutRows.length.toLocaleString();
+      document.getElementById('kpiGmm').textContent = gmmOutCount.toLocaleString();
+      document.getElementById('kpiLof').textContent = lofOutCount.toLocaleString();
+
+      applyTableFilters(false);
+      renderEvaluationSection();
+      renderConsensusAndRanking();
+      drawProjection2027();
+      evaluateSimulator();
+      renderOperationalRadar();
+      refreshExecutiveReport();
+    }
+
+    function downloadAmpliadoCSV() {
+      const headers = ['id', 'departamento', 'zona', 'cultivo', 'anio', 'superficie', 'produccion', 'rendimiento', 'precio', 'realAnomalia', 'iqrOutlier', 'gmmOutlier', 'lofOutlier', 'lofScore', 'consensusCount'];
+      const chunks = [headers.join(',') + '\n'];
+      for (let i = 0; i < dataset.length; i++) {
+        const r = dataset[i];
+        chunks.push(`${r.id},"${r.departamento}","${r.zona}","${r.cultivo}",${r.anio},${r.superficie},${r.produccion},${r.rendimiento},${r.precio},${r.realAnomalia},${r.iqrOutlier},${r.gmmOutlier},${r.lofOutlier},${r.lofScore},${r.consensusCount}\n`);
+      }
+      const blob = new Blob(chunks, { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bolivia_agricola_${dataset.length}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ Archivo bolivia_agricola_${dataset.length}.csv descargado.`);
+    }
+
+    function exportSummaryJSON() {
+      const c3List = dataset.filter(r => r.consensusCount === 3);
+      const payload = {
+        proyecto: 'Detección de Anomalías Agrícolas Bolivia (IQR, GMM, LOF)',
+        totalRegistros: dataset.length,
+        gmmConfig: currentGmmMeta,
+        conteos: {
+          iqr: dataset.filter(r => r.iqrOutlier === 1).length,
+          gmm: dataset.filter(r => r.gmmOutlier === 1).length,
+          lof: dataset.filter(r => r.lofOutlier === 1).length,
+          consenso3: c3List.length,
+          consenso2: dataset.filter(r => r.consensusCount === 2).length,
+          consenso1: dataset.filter(r => r.consensusCount === 1).length
+        },
+        muestraConsenso3: c3List.slice(0, 50)
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `resumen_gmm_lof_bolivia_${dataset.length}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('✓ Resumen JSON exportado correctamente.');
+    }
+
+    function handleCsvUpload(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const lines = e.target.result.split(/\r?\n/).filter(l => l.trim().length > 0);
+          if (lines.length < 6) return;
+          const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+          const parsed = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+            if (cols.length < 4) continue;
+            const getNum = (names, fallback) => {
+              const idx = headers.findIndex(h => names.some(n => h.includes(n)));
+              const val = idx >= 0 ? parseFloat(cols[idx]) : NaN;
+              return Number.isFinite(val) ? val : fallback;
+            };
+            const getStr = (names, fallback) => {
+              const idx = headers.findIndex(h => names.some(n => h.includes(n)));
+              return (idx >= 0 && cols[idx]) ? cols[idx] : fallback;
+            };
+
+            const sup = getNum(['superficie', 'sup', 'area'], 10000 + i * 150);
+            const rend = getNum(['rendimiento', 'rend', 'yield'], 2.5);
+            const prod = getNum(['produccion', 'prod'], Math.round(sup * rend));
+            const prec = getNum(['precio', 'price', 'amount'], 150);
+
+            parsed.push({
+              id: getStr(['id'], `CSV-${String(i).padStart(5, '0')}`),
+              departamento: getStr(['depto', 'departamento', 'region'], 'Bolivia'),
+              zona: getStr(['zona', 'municipio', 'zone'], 'Zona General'),
+              cultivo: getStr(['cultivo', 'producto', 'crop'], 'General'),
+              anio: Math.round(getNum(['anio', 'año', 'year'], 2024)),
+              superficie: sup,
+              produccion: prod,
+              rendimiento: rend,
+              precio: prec,
+              realAnomalia: Math.round(getNum(['realanomalia', 'anomalia', 'class', 'outlier'], 0)) ? 1 : 0,
+              nota: getStr(['nota', 'contexto'], 'Registro cargado desde CSV')
+            });
+          }
+
+          if (parsed.length >= 5) {
+            dataset = parsed;
+            currentPage = 1;
+            populateFilters();
+            recalculateAll();
+            showToast(`✓ CSV cargado correctamente (${dataset.length.toLocaleString()} registros).`);
+          }
+        } catch (err) {
+          showToast('No se pudo interpretar el formato del CSV.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('copyFeedbackMsg');
+      box.textContent = msg;
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 3200);
+    }
+
+    function answerAssistantQuery(rawQ) {
+      const q = normalizeText(rawQ);
+      const total = dataset.length;
+      const nIqr = dataset.filter(r => r.iqrOutlier === 1).length;
+      const nGmm = dataset.filter(r => r.gmmOutlier === 1).length;
+      const nLof = dataset.filter(r => r.lofOutlier === 1).length;
+      const nC3 = dataset.filter(r => r.consensusCount === 3).length;
+      const nC2 = dataset.filter(r => r.consensusCount === 2).length;
+      const nReal = dataset.filter(r => r.realAnomalia === 1).length;
+
+      if (q.includes('real')) {
+        return `El filtro <strong>Real=1</strong> muestra <strong>${nReal.toLocaleString()}</strong> anomalías documentadas (sequías, heladas, inundaciones, bloqueos o errores de digitación) dentro de ${total.toLocaleString()} registros.`;
+      }
+      if (q.includes('gmm') || q.includes('gauss')) {
+        return `GMM está configurado con <strong>G = ${currentGmmMeta.G}</strong> componentes y umbral en el percentil <strong>${currentGmmMeta.percentile}%</strong>, detectando <strong>${nGmm.toLocaleString()}</strong> anomalías probabilísticas sobre ${total.toLocaleString()} registros.`;
+      }
+      if (q.includes('ranking') || q.includes('depart')) {
+        const deptos = [...new Set(dataset.map(r => r.departamento))].map(d => {
+          const cnt = dataset.filter(r => r.departamento === d && r.consensusCount >= 1).length;
+          return { d, cnt };
+        }).sort((a, b) => b.cnt - a.cnt).slice(0, 3);
+        return `En los datos activos (${total.toLocaleString()} registros), los departamentos con mayor conteo de anomalías (≥1 método) son: <strong>${deptos.map(x => `${x.d} (${x.cnt.toLocaleString()})`).join(', ')}</strong>.`;
+      }
+      if (q.includes('consenso') || q.includes('3/3')) {
+        return `Actualmente hay <strong>${nC3.toLocaleString()}</strong> observaciones con <strong>consenso 3/3</strong> y <strong>${nC2.toLocaleString()}</strong> con <strong>consenso 2/3</strong> sobre ${total.toLocaleString()} registros.`;
+      }
+      if (q.includes('2027') || q.includes('proyecc')) {
+        return `La proyección lineal al 2027 contrasta la tendencia histórica (2015–2026) con un <strong>escenario base</strong> y un <strong>escenario de estrés climático</strong> (con caída proyectada del 28% respecto al base por eventos adversos).`;
+      }
+      return `Sobre <strong>${total.toLocaleString()}</strong> registros activos: IQR detecta <strong>${nIqr.toLocaleString()}</strong> atípicos univariados, GMM detecta <strong>${nGmm.toLocaleString()}</strong> anomalías probabilísticas y LOF detecta <strong>${nLof.toLocaleString()}</strong> anomalías locales (Real=1: <strong>${nReal.toLocaleString()}</strong> · consenso 3/3: <strong>${nC3.toLocaleString()}</strong>).`;
+    }
+
+    function appendChatMsg(html, isUser = false) {
+      const box = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = isUser
+        ? 'p-2.5 rounded-xl bg-blue-600 text-white ml-8 leading-relaxed'
+        : 'p-3 rounded-xl bg-white border border-slate-200 text-slate-700 mr-4 leading-relaxed';
+      div.innerHTML = html;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const qrInput = document.getElementById('qrAccessInput');
+      const pageHint = document.getElementById('qrActualUrlHint');
+      if (window.location.href && window.location.href !== 'about:blank') {
+        pageHint.textContent = window.location.href.split('/').pop() || 'HTML activo';
+      }
+      drawQRCode('pageQrCanvas', qrInput.value);
+      qrInput.addEventListener('input', () => {
+        drawQRCode('pageQrCanvas', qrInput.value);
+        refreshExecutiveReport();
+      });
+
+      document.getElementById('copyAccessCodeBtn').addEventListener('click', () => {
+        qrInput.select();
+        document.execCommand('copy');
+        showToast('✓ Código/enlace de acceso copiado y QR actualizado.');
+      });
+
+      buildNavigation();
+      populateFilters();
+      renderRScript();
+      recalculateAll();
+
+      document.getElementById('datasetSizeSelect').addEventListener('change', (e) => {
+        currentDatasetSize = parseInt(e.target.value, 10) || 25000;
+        dataset = generateBoliviaDataset(currentDatasetSize);
+        currentPage = 1;
+        populateFilters();
+        recalculateAll();
+        showToast(`✓ Dataset actualizado a ${dataset.length.toLocaleString()} registros.`);
+      });
+
+      document.getElementById('prevPageBtn').addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderDatasetPage();
+        }
+      });
+      document.getElementById('nextPageBtn').addEventListener('click', () => {
+        currentPage++;
+        renderDatasetPage();
+      });
+
+      document.getElementById('filterDepto').addEventListener('change', (e) => {
+        populateZonasSelect(e.target.value);
+        applyTableFilters(true);
+      });
+      ['filterZona', 'filterCultivo', 'filterEstado'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => applyTableFilters(true));
+      });
+      document.getElementById('filterSearch').addEventListener('input', () => applyTableFilters(true));
+
+      document.getElementById('quickFilterGmm').addEventListener('click', () => {
+        document.getElementById('filterEstado').value = 'SOLO_GMM';
+        applyTableFilters(true);
+      });
+      document.getElementById('quickFilterC3').addEventListener('click', () => {
+        document.getElementById('filterEstado').value = 'CONSENSUS_3';
+        applyTableFilters(true);
+      });
+      document.getElementById('quickFilterReal').addEventListener('click', () => {
+        document.getElementById('filterEstado').value = 'REAL_ANOMALO';
+        applyTableFilters(true);
+      });
+      document.getElementById('quickFilterAll').addEventListener('click', () => {
+        document.getElementById('filterDepto').value = 'TODOS';
+        populateZonasSelect('TODOS');
+        document.getElementById('filterCultivo').value = 'TODOS';
+        document.getElementById('filterEstado').value = 'TODOS';
+        document.getElementById('filterSearch').value = '';
+        applyTableFilters(true);
+      });
+
+      // Botones del semáforo para filtrar en la sección #datos
+      const jumpToFilteredData = (keyword, labelMsg) => {
+        document.getElementById('filterEstado').value = 'ANOMALO';
+        document.getElementById('filterSearch').value = keyword;
+        applyTableFilters(true);
+        document.getElementById('datos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        showToast(labelMsg);
+      };
+      document.getElementById('filterSemaforoDatoBtn').addEventListener('click', () => {
+        jumpToFilteredData('error', '✓ Filtrado en Dataset: casos de error de carga / unidad.');
+      });
+      document.getElementById('filterSemaforoCampoBtn').addEventListener('click', () => {
+        jumpToFilteredData('sequia', '✓ Filtrado en Dataset: casos agroclimáticos / campo.');
+      });
+      document.getElementById('filterSemaforoLogisticaBtn').addEventListener('click', () => {
+        jumpToFilteredData('bloqueo', '✓ Filtrado en Dataset: casos de logística / precio.');
+      });
+
+      // Generador de reporte ejecutivo y CSV rápido de 300 registros
+      document.getElementById('refreshExecReportBtn').addEventListener('click', () => {
+        refreshExecutiveReport();
+        showToast('✓ Reporte ejecutivo actualizado con los datos activos.');
+      });
+      document.getElementById('includeHtmlRefCheck').addEventListener('change', refreshExecutiveReport);
+      document.getElementById('execTargetInput').addEventListener('input', refreshExecutiveReport);
+
+      document.getElementById('copyExecReportBtn').addEventListener('click', () => {
+        const ta = document.getElementById('execReportTextarea');
+        if (!ta.value.trim()) ta.value = buildExecutiveReportText();
+        ta.select();
+        document.execCommand('copy');
+        showToast('✓ Reporte ejecutivo copiado listo para WhatsApp o correo.');
+      });
+
+      document.getElementById('downloadQuick300CsvBtn').addEventListener('click', downloadQuick300CSV);
+
+      document.getElementById('classicVarSelect').addEventListener('change', recalculateAll);
+      document.getElementById('gmmGSlider').addEventListener('input', recalculateAll);
+      document.getElementById('gmmQuantileSlider').addEventListener('input', recalculateAll);
+      document.getElementById('gmmAxisSelect').addEventListener('change', recalculateAll);
+      document.getElementById('lofKSlider').addEventListener('input', recalculateAll);
+      document.getElementById('lofThreshSlider').addEventListener('input', recalculateAll);
+      document.getElementById('lofAxisSelect').addEventListener('change', recalculateAll);
+
+      document.querySelectorAll('.lof-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('lofKSlider').value = btn.dataset.k;
+          document.getElementById('lofThreshSlider').value = btn.dataset.thr;
+          recalculateAll();
+        });
+      });
+
+      document.getElementById('evalModelSelect').addEventListener('change', renderEvaluationSection);
+      document.getElementById('projCultivoSelect').addEventListener('change', drawProjection2027);
+
+      ['simSup', 'simProd', 'simRend', 'simPrec'].forEach(id => {
+        document.getElementById(id).addEventListener('input', evaluateSimulator);
+      });
+
+      document.getElementById('simPresetNormal').addEventListener('click', () => {
+        document.getElementById('simSup').value = 20000;
+        document.getElementById('simRend').value = 2.85;
+        document.getElementById('simProd').value = 57000;
+        document.getElementById('simPrec').value = 165;
+        evaluateSimulator();
+      });
+      document.getElementById('simPresetSequia').addEventListener('click', () => {
+        document.getElementById('simSup').value = 24000;
+        document.getElementById('simRend').value = 0.45;
+        document.getElementById('simProd').value = 10800;
+        document.getElementById('simPrec').value = 460;
+        evaluateSimulator();
+      });
+      document.getElementById('simPresetError').addEventListener('click', () => {
+        document.getElementById('simSup').value = 18000;
+        document.getElementById('simRend').value = 16.50;
+        document.getElementById('simProd').value = 297000;
+        document.getElementById('simPrec').value = 155;
+        evaluateSimulator();
+      });
+
+      bindCanvasHover('gmmScatterCanvas', 'gmmTooltip', () => gmmPointsCache,
+        r => `Densidad GMM: ${r.gmmDensity.toExponential(2)} (${r.gmmOutlier ? 'ANOMALÍA' : 'Normal'})`);
+      bindCanvasHover('lofScatterCanvas', 'lofTooltip', () => lofPointsCache,
+        r => `Puntaje LOF: ${r.lofScore.toFixed(2)} (${r.lofOutlier ? 'ANOMALÍA LOCAL' : 'Normal'})`);
+
+      document.querySelectorAll('.r-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentRTab = btn.dataset.tab;
+          renderRScript();
+        });
+      });
+
+      document.getElementById('copyRCodeBtn').addEventListener('click', () => {
+        const text = R_SCRIPTS[currentRTab];
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('✓ Script de RStudio copiado al portapapeles.');
+      });
+
+      document.getElementById('downloadAmpliadoCsvBtn').addEventListener('click', downloadAmpliadoCSV);
+      document.getElementById('downloadCsvBtn').addEventListener('click', downloadAmpliadoCSV);
+      document.getElementById('exportJsonSummaryBtn').addEventListener('click', exportSummaryJSON);
+
+      document.getElementById('csvUploadInput').addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) handleCsvUpload(e.target.files[0]);
+      });
+
+      document.getElementById('resetDatasetBtn').addEventListener('click', () => {
+        dataset = generateBoliviaDataset(currentDatasetSize);
+        currentPage = 1;
+        populateFilters();
+        recalculateAll();
+        showToast(`✓ Dataset agrícola de Bolivia regenerado (${dataset.length.toLocaleString()} registros).`);
+      });
+
+      const chatPanel = document.getElementById('chatPanel');
+      document.getElementById('chatToggleBtn').addEventListener('click', () => chatPanel.classList.toggle('hidden'));
+      document.getElementById('chatCloseBtn').addEventListener('click', () => chatPanel.classList.add('hidden'));
+
+      document.querySelectorAll('.chat-quick').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const qText = btn.textContent;
+          appendChatMsg(qText, true);
+          appendChatMsg(answerAssistantQuery(btn.dataset.q), false);
+        });
+      });
+
+      document.getElementById('chatForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const inp = document.getElementById('chatInput');
+        const val = inp.value.trim();
+        if (!val) return;
+        appendChatMsg(val, true);
+        appendChatMsg(answerAssistantQuery(val), false);
+        inp.value = '';
+      });
+
+      let resizeTimer;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          drawQRCode('pageQrCanvas', qrInput.value);
+          recalculateAll();
+        }, 140);
+      });
+    });
+  </script>
+</body>
+</html>
